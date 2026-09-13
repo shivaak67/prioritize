@@ -3,6 +3,10 @@ package com.prioritize.service;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.ZoneId;
+import java.time.DayOfWeek;
+import java.time.temporal.TemporalAdjusters;
+import com.prioritize.repository.CalendarEventRepository;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,20 +31,29 @@ public class DashboardService {
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
     private final Clock clock;
+    private final CalendarEventRepository calendarRepository;
 
     public DashboardService(
             TaskRepository taskRepository,
             ProjectRepository projectRepository,
+            CalendarEventRepository calendarRepository,
             Clock clock) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
         this.clock = clock;
+        this.calendarRepository = calendarRepository;
     }
 
     @Transactional(readOnly = true)
     public DashboardSummaryResponse summary(UUID userId) {
-        LocalDate today = LocalDate.ofInstant(clock.instant(), ZoneOffset.UTC);
-        LocalDate endOfWeekExclusive = today.plusDays(7);
+        return summary(userId, ZoneOffset.UTC);
+    }
+
+    @Transactional(readOnly = true)
+    public DashboardSummaryResponse summary(UUID userId, ZoneId zone) {
+        LocalDate today = LocalDate.ofInstant(clock.instant(), zone);
+        LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate endOfWeekExclusive = weekStart.plusDays(7);
 
         List<Task> tasks = taskRepository.findFiltered(userId, null, null, null);
         Map<UUID, String> projectNames = projectRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
@@ -77,10 +90,11 @@ public class DashboardService {
                 if (due.equals(today)) {
                     dueToday++;
                 }
-                if (due.isBefore(today)) {
+                if (due.isBefore(today) || (due.equals(today) && task.getDueTime() != null
+                        && due.atTime(task.getDueTime()).atZone(zone).toInstant().isBefore(clock.instant()))) {
                     overdue++;
                 }
-                if (!due.isBefore(today) && due.isBefore(endOfWeekExclusive)) {
+                if (!due.isBefore(weekStart) && due.isBefore(endOfWeekExclusive)) {
                     dueThisWeek++;
                     hoursThisWeek += minutesToHours(task.getEstimatedMinutes());
                 }
@@ -110,6 +124,17 @@ public class DashboardService {
                                 existing.taskCount() + 1,
                                 existing.estimatedHours() + minutesToHours(task.getEstimatedMinutes())));
             }
+        }
+
+        for (var event : calendarRepository.findByUserIdAndCanvasKeyIsNotNull(userId)) {
+            if (!"DEADLINE".equals(event.getCanvasKind())) continue;
+            if (event.isCanvasCompleted()) { completed++; continue; }
+            remaining++;
+            LocalDate due = event.isAllDay() && event.getCanvasStartDate() != null
+                    ? event.getCanvasStartDate() : event.getStartAt().atZone(zone).toLocalDate();
+            if (due.equals(today)) dueToday++;
+            if (!due.isBefore(weekStart) && due.isBefore(endOfWeekExclusive)) dueThisWeek++;
+            if (due.isBefore(today) || (!event.isAllDay() && event.getStartAt().isBefore(clock.instant()))) overdue++;
         }
 
         List<DashboardSummaryResponse.WorkloadByProject> workloadByProject = workload.values().stream()

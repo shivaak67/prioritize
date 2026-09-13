@@ -46,6 +46,11 @@ public class AssistantService {
             Do not tell the user to do it manually if you can do it with a tool.
             After using tools, confirm what you did in plain language.
             Use only the user data provided below. If something is not in the data, say you do not have that information.
+            Canvas assignment deadlines (including quizzes) are work to complete, just like personal tasks.
+            For daily focus or planning questions, always check unfinished Canvas assignments due today
+            and overdue assignments before recommending later work. Mention today's quiz without requiring a follow-up.
+            Completed Canvas assignments must not be recommended as unfinished work.
+            All-day Canvas dates are date-only deadlines, not appointments or midnight deadlines.
             Be concise, practical, and friendly. Prefer short paragraphs or bullet lists when listing items.
             The current date and timezone in USER DATA are authoritative for this request.
             Use them for today, tomorrow, and relative dates, even if earlier chat messages give a different date.
@@ -89,7 +94,7 @@ public class AssistantService {
                             .withZone(zone).format(clock.instant()) + ".", aiProperties.isConfigured());
         }
         if (!aiProperties.isConfigured()) {
-            return new AssistantChatResponse(answerLocally(userId, request.message()), false);
+            return new AssistantChatResponse(answerLocally(userId, request.message(), zone), false);
         }
 
         String context = buildContext(userId, zone);
@@ -158,8 +163,8 @@ public class AssistantService {
         Instant weekAhead = now.plusSeconds(7L * 24 * 60 * 60);
 
         List<TaskResponse> tasks = taskService.list(userId, null, null, null);
-        DashboardSummaryResponse summary = dashboardService.summary(userId);
-        List<CalendarEventResponse> events = calendarEventService.list(userId, now, weekAhead);
+        DashboardSummaryResponse summary = dashboardService.summary(userId, zone);
+        List<CalendarEventResponse> events = calendarEventService.list(userId, null, null);
 
         StringBuilder sb = new StringBuilder();
         sb.append("Today: ").append(DATE_LABEL.withZone(zone).format(now)).append('\n');
@@ -167,7 +172,7 @@ public class AssistantService {
         sb.append("User timezone: ").append(zone.getId()).append('\n');
         sb.append('\n');
 
-        sb.append("Dashboard summary:\n");
+        sb.append("Combined personal-task and Canvas-assignment summary:\n");
         sb.append("- Due today: ").append(summary.dueTodayCount()).append('\n');
         sb.append("- Due this week: ").append(summary.dueThisWeekCount()).append('\n');
         sb.append("- Overdue: ").append(summary.overdueCount()).append('\n');
@@ -216,7 +221,25 @@ public class AssistantService {
         }
         sb.append('\n');
 
-        sb.append("Upcoming calendar events (next 7 days):\n");
+        sb.append("Canvas assignments (completion is tracked in Prioritize):\n");
+        for (CalendarEventResponse event : events) {
+            if (!"DEADLINE".equals(event.canvasKind())) continue;
+            var due = event.allDay() && event.canvasStartDate() != null
+                    ? event.canvasStartDate() : event.startAt().atZone(zone).toLocalDate();
+            var today = now.atZone(zone).toLocalDate();
+            String state = event.canvasCompleted() ? "COMPLETED" : due.equals(today) ? "DUE TODAY"
+                    : due.isBefore(today) ? "OVERDUE" : "UPCOMING";
+            if (!event.canvasCompleted() && !event.allDay() && event.startAt().isBefore(now)) state += " / OVERDUE";
+            sb.append("- [id=").append(event.id()).append("] ").append(event.title())
+                    .append(" [").append(state).append(", due ").append(due)
+                    .append(event.allDay() ? " (all day)" : " at " + TIME_RANGE_FORMAT.withZone(zone).format(event.startAt()))
+                    .append("]\n");
+        }
+        sb.append('\n');
+        events = events.stream().filter(e -> !"DEADLINE".equals(e.canvasKind())
+                && e.endAt().isAfter(now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant())
+                && e.startAt().isBefore(weekAhead)).toList();
+        sb.append("Calendar events (today and next 7 days):\n");
         if (events.isEmpty()) {
             sb.append("- (none)\n");
         } else {
@@ -263,8 +286,8 @@ public class AssistantService {
         return task.dueDate().toString();
     }
 
-    private String answerLocally(UUID userId, String message) {
-        DashboardSummaryResponse summary = dashboardService.summary(userId);
+    private String answerLocally(UUID userId, String message, ZoneId zone) {
+        DashboardSummaryResponse summary = dashboardService.summary(userId, zone);
         List<TaskResponse> tasks = taskService.list(userId, null, null, null);
         String question = message == null ? "" : message.toLowerCase(Locale.US);
 
@@ -276,13 +299,13 @@ public class AssistantService {
         }
 
         if (question.contains("overdue")) {
-            return "You have " + summary.overdueCount() + " overdue open task(s).";
+            return "You have " + summary.overdueCount() + " overdue open task(s) and Canvas assignment(s).";
         }
         if (question.contains("due today") || question.contains("today")) {
-            return "You have " + summary.dueTodayCount() + " task(s) due today.";
+            return "You have " + summary.dueTodayCount() + " task(s) and Canvas assignment(s) due today.";
         }
         if (question.contains("this week") || question.contains("week")) {
-            return "You have " + summary.dueThisWeekCount() + " open task(s) due this week.";
+            return "You have " + summary.dueThisWeekCount() + " open task(s) and Canvas assignment(s) due this week.";
         }
         if (question.contains("how many") && question.contains("task")) {
             return "You have " + summary.remainingCount() + " open task(s) in total.";

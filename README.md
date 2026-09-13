@@ -10,7 +10,7 @@ Refreshed September 9, 2026. Authenticated pages show the current application ru
 
 ### Dashboard
 
-See today's tasks and Canvas deadlines, weekly progress, and shortcuts to the AI assistant.
+Due Today, Overdue, This Week, and weekly progress include personal tasks and Canvas assignments, with completed assignments excluded from open counts. Dates use the user's timezone; date-only Canvas deadlines keep their original date. The AI assistant checks these assignments when recommending today's work.
 
 ![Dashboard with today's plan and weekly progress](docs/screenshots/dashboard.jpg)
 
