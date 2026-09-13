@@ -1,3 +1,4 @@
+import { canvasDeadlineTask } from '../../core/api/canvas-deadline';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -122,14 +123,29 @@ export class TasksComponent implements OnInit {
   });
 
   readonly upcomingEvents = computed(() =>
-    this.events().filter(event => !event.canvasKind).sort(
+    this.events().filter(event => !event.canvasKind && inEventWindow(event)).sort(
       (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
     ),
   );
 
-  readonly canvasAssignments = computed(() => this.events().filter(event => event.canvasKind === 'DEADLINE')
+  readonly canvasAssignments = computed(() => this.events().filter(event => {
+    if (event.canvasKind !== 'DEADLINE') return false;
+    const task = canvasDeadlineTask(event);
+    const today = toDatetimeLocalValue(new Date()).slice(0, 10);
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 6) % 7);
+    const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7);
+    const due = task.dueDate!;
+    const open = !event.canvasCompleted;
+    const matches = this.view() === 'all' || (this.view() === 'open' && open)
+      || (this.view() === 'completed' && !open)
+      || (this.view() === 'today' && open && due === today)
+      || (this.view() === 'week' && open && due >= toDatetimeLocalValue(weekStart).slice(0, 10) && due < toDatetimeLocalValue(weekEnd).slice(0, 10))
+      || (this.view() === 'overdue' && open && (due < today || (!!task.dueTime && new Date(event.startAt).getTime() < Date.now())));
+    return matches && `${task.title} ${task.description ?? ''}`.toLocaleLowerCase().includes(this.search().trim().toLocaleLowerCase());
+  })
     .sort((a, b) => a.startAt.localeCompare(b.startAt)));
-  readonly canvasEvents = computed(() => this.events().filter(event => event.canvasKind === 'EVENT')
+  readonly canvasEvents = computed(() => this.events().filter(event => event.canvasKind === 'EVENT' && inEventWindow(event))
     .sort((a, b) => a.startAt.localeCompare(b.startAt)));
   readonly eventEditForm = this.fb.nonNullable.group({
     title: ['', [Validators.required, Validators.maxLength(255)]],
@@ -190,11 +206,10 @@ export class TasksComponent implements OnInit {
   reload(): void {
     this.loading.set(true);
     this.error.set(null);
-    const { from, to } = eventRangeIso();
 
     forkJoin({
       tasks: this.api.listTasks(),
-      events: this.api.listCalendarEvents(from, to),
+      events: this.api.listCalendarEvents(),
     }).subscribe({
       next: ({ tasks, events }) => {
         this.tasks.set(tasks);
@@ -472,4 +487,9 @@ function toTimeInputValue(dueTime: string | null): string {
     return '';
   }
   return dueTime.length >= 5 ? dueTime.slice(0, 5) : dueTime;
+}
+
+function inEventWindow(event: CalendarEventDto): boolean {
+  const { from, to } = eventRangeIso();
+  return event.endAt > from && event.startAt < to;
 }

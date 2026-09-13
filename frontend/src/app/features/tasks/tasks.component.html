@@ -217,7 +217,7 @@
       @if (group.items.length) {
         <section class="tasks__section">
           <h2 class="tasks__section-title">{{ group.title }}</h2>
-          <p class="tasks__section-hint">Due dates and events for the next 30 days. Synced from Canvas; make changes in Canvas.</p>
+          <p class="tasks__section-hint">{{ group.title === 'Canvas assignments' ? 'Assignments matching your task filters.' : 'Events for the next 30 days.' }} Synced from Canvas; edit dates and titles in Canvas.</p>
           <ul class="tasks__event-list">
             @for (event of group.items; track event.id) {
               <li class="tasks__event-item tasks__event-item--canvas" [class.tasks__event-item--completed]="event.canvasCompleted">

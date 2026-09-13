@@ -1,3 +1,4 @@
+import { canvasDeadlineTask } from '../../core/api/canvas-deadline';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { OnboardingComponent } from '../onboarding/onboarding.component';
 import { OnboardingService } from '../onboarding/onboarding.service';
@@ -55,6 +56,9 @@ export class DashboardComponent implements OnInit {
   readonly tasks = signal<TaskDto[]>([]);
   readonly events = signal<CalendarEventDto[]>([]);
 
+  readonly planningTasks = computed(() => [...this.tasks(),
+    ...this.events().filter(e => e.canvasKind === 'DEADLINE').map(canvasDeadlineTask)]);
+
   readonly aiPrompts = [
     'What should I work on today?',
     'What tasks are overdue?',
@@ -92,7 +96,7 @@ export class DashboardComponent implements OnInit {
     let overdue = 0;
     let dueThisWeek = 0;
 
-    for (const task of this.tasks()) {
+    for (const task of this.planningTasks()) {
       const isOpen = task.status === 'TODO' || task.status === 'IN_PROGRESS';
       if (!isOpen || !task.dueDate) {
         continue;
@@ -120,7 +124,8 @@ export class DashboardComponent implements OnInit {
     const items: PlanItem[] = [];
 
     for (const event of this.events()) {
-      if (!overlapsDay(event.startAt, event.endAt, todayKey)) {
+      if (event.canvasKind === 'DEADLINE' ? event.canvasCompleted || canvasDeadlineTask(event).dueDate !== todayKey
+          : !overlapsDay(event.startAt, event.endAt, todayKey)) {
         continue;
       }
       const start = new Date(event.startAt);
@@ -168,7 +173,7 @@ export class DashboardComponent implements OnInit {
     let total = 0;
     let done = 0;
 
-    for (const task of this.tasks()) {
+    for (const task of this.planningTasks()) {
       if (task.status === 'CANCELLED' || !task.dueDate || task.dueDate < weekStartKey || task.dueDate >= weekEndKey) {
         continue;
       }
@@ -189,7 +194,7 @@ export class DashboardComponent implements OnInit {
     const horizonKey = toDateKey(horizon);
     const items: DeadlineItem[] = [];
 
-    for (const task of this.tasks()) {
+    for (const task of this.planningTasks()) {
       const isOpen = task.status === 'TODO' || task.status === 'IN_PROGRESS';
       if (
         !isOpen ||
@@ -202,16 +207,17 @@ export class DashboardComponent implements OnInit {
       if (!due) continue;
       const overdue = task.dueDate < todayKey || (!!task.dueTime && due.getTime() < now.getTime());
       items.push({
-        id: `task-${task.id}`,
+        id: `${this.events().some(e => e.id === task.id && e.canvasKind === 'DEADLINE') ? 'event' : 'task'}-${task.id}`,
         title: task.title,
         when: `${overdue ? 'Overdue · ' : ''}${relativeDueLabel(task.dueDate)}${task.dueTime ? ` · ${formatTime(due)}` : ''}`,
         sortKey: due.getTime(),
-        route: '/tasks',
+        route: this.events().some(e => e.id === task.id && e.canvasKind === 'DEADLINE') ? '/calendar' : '/tasks',
         overdue,
       });
     }
 
     for (const event of this.events()) {
+      if (event.canvasKind === 'DEADLINE') continue;
       const start = new Date(event.startAt);
       const end = new Date(event.endAt);
       const dayKey = toDateKey(start);
@@ -223,7 +229,7 @@ export class DashboardComponent implements OnInit {
         title: event.title,
         when: event.allDay
           ? relativeDueLabel(dayKey)
-          : `${relativeDueLabel(dayKey)} · ${event.canvasKind === 'DEADLINE' ? 'Due ' + formatTime(start) : formatTimeRange(start, end)}`,
+          : `${relativeDueLabel(dayKey)} · ${formatTimeRange(start, end)}`,
         sortKey: start.getTime(),
         route: '/calendar',
         overdue: false,
@@ -244,13 +250,10 @@ export class DashboardComponent implements OnInit {
   reload(): void {
     this.loading.set(true);
     this.error.set(null);
-    const today = startOfDay(new Date());
-    const from = today.toISOString();
-    const to = addDays(today, 7).toISOString();
 
     forkJoin({
       tasks: this.api.listTasks(),
-      events: this.api.listCalendarEvents(from, to),
+      events: this.api.listCalendarEvents(),
     }).subscribe({
       next: ({ tasks, events }) => {
         this.tasks.set(tasks);

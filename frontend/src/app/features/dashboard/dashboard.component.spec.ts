@@ -55,4 +55,28 @@ describe('Dashboard deadlines', () => {
     spyOn(component, 'reload'); component.ngOnInit(); expect(component.canvasConnected()).toBeFalse();
     api.getCanvasFeed = jasmine.createSpy().and.returnValue(of({ connected: true }));
     component.ngOnInit(); expect(component.canvasConnected()).toBeTrue();
-  });});
+  });it('includes a date-only Canvas quiz in today, counts, progress, and deadlines', () => {
+    const quiz = { ...event('quiz', '2026-09-06T00:00:00Z', '2026-09-07T00:00:00Z'),
+      canvasKind: 'DEADLINE', allDay: true, canvasStartDate: '2026-09-05', canvasCompleted: false } as CalendarEventDto;
+    component.tasks.set([task('done', '2026-09-05', 'COMPLETED')]);
+    component.events.set([quiz]);
+    expect(component.stats().map(s => s.value)).toEqual([1, 0, 1]);
+    expect(component.weeklyProgress()).toEqual({ done: 1, total: 2, percent: 50 });
+    expect(component.todayPlan().map(i => i.id)).toEqual(['event-quiz']);
+    expect(component.upcomingDeadlines().map(i => i.id)).toEqual(['event-quiz']);
+    component.events.set([{ ...quiz, canvasCompleted: true }]);
+    expect(component.stats().map(s => s.value)).toEqual([0, 0, 0]);
+    expect(component.weeklyProgress().percent).toBe(100);
+    expect(component.todayPlan()).toEqual([]);
+    expect(component.upcomingDeadlines()).toEqual([]);
+  });
+  it('retains past Canvas deadlines as overdue but excludes ordinary events from counts', () => {
+    component.events.set([
+      { ...event('old', '2026-08-01T12:00:00', '2026-08-01T12:00:00.001'), canvasKind: 'DEADLINE' },
+      { ...event('late', '2026-09-05T09:00:00', '2026-09-05T09:00:00.001'), canvasKind: 'DEADLINE' },
+      event('meeting', '2026-09-05T12:00:00', '2026-09-05T13:00:00'),
+    ] as CalendarEventDto[]);
+    expect(component.stats().map(s => s.value)).toEqual([1, 2, 1]);
+    expect(component.upcomingDeadlines().filter(i => i.overdue).map(i => i.id)).toEqual(['event-old', 'event-late']);
+  });
+});

@@ -50,7 +50,7 @@ class AssistantDateTest {
     void modelContextContainsCurrentLocalDateAndZone() {
         properties.setEnabled(true);
         properties.setApiKey("test");
-        when(dashboard.summary(userId)).thenReturn(mock(DashboardSummaryResponse.class));
+        when(dashboard.summary(userId, ZoneId.of("America/Chicago"))).thenReturn(mock(DashboardSummaryResponse.class));
         when(llm.complete(any(), any())).thenReturn(new LlmCompletion("Ready", List.of()));
         service.chat(userId, new AssistantChatRequest("Help plan tomorrow", null, "America/Chicago"));
         ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
@@ -78,5 +78,27 @@ class AssistantDateTest {
         ArgumentCaptor<CalendarEventRequest> request = ArgumentCaptor.forClass(CalendarEventRequest.class);
         verify(events).create(eq(userId), request.capture());
         assertThat(request.getValue().startAt()).isEqualTo(Instant.parse("2026-09-05T21:00:00Z"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void dailyFocusContextExplicitlyIncludesQuizAndCompletionEvenAfterItsTimestamp() {
+        properties.setEnabled(true); properties.setApiKey("test");
+        when(dashboard.summary(userId, ZoneId.of("America/Chicago"))).thenReturn(mock(DashboardSummaryResponse.class));
+        var quiz = new CalendarEventResponse(UUID.randomUUID(), null, "Quiz 3", null,
+                Instant.parse("2026-09-05T00:00:00Z"), Instant.parse("2026-09-06T00:00:00Z"),
+                true, null, null, "DEADLINE", null, LocalDate.parse("2026-09-05"), LocalDate.parse("2026-09-06"), false);
+        var done = new CalendarEventResponse(UUID.randomUUID(), null, "Completed quiz", null,
+                quiz.startAt(), quiz.endAt(), true, null, null, "DEADLINE", null,
+                quiz.canvasStartDate(), quiz.canvasEndDate(), true);
+        when(events.list(userId, null, null)).thenReturn(List.of(quiz, done));
+        when(llm.complete(any(), any())).thenReturn(new LlmCompletion("Quiz 3 is due today", List.of()));
+        service.chat(userId, new AssistantChatRequest("What should I focus on today?", null, "America/Chicago"));
+        ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
+        verify(llm).complete(messages.capture(), any());
+        assertThat(messages.getValue().getFirst().get("content").toString())
+                .contains("Quiz 3 [DUE TODAY, due 2026-09-05 (all day)]",
+                        "Completed quiz [COMPLETED, due 2026-09-05 (all day)]",
+                        "always check unfinished Canvas assignments due today");
     }
 }

@@ -81,4 +81,18 @@ describe('Task discovery', () => {
     api.setCanvasAssignmentCompleted.and.returnValue(throwError(() => new Error('offline')));
     component.toggleCanvasComplete(component.events()[0]); expect(component.events()[0].canvasCompleted).toBeFalse();
     expect(component.error()).toBeTruthy(); expect(component.completingCanvasId()).toBeNull();
-  });});
+  });  it('filters Canvas assignments when opening a dashboard count', () => {
+    jasmine.clock().install();
+    try {
+      jasmine.clock().mockDate(new Date(2026, 8, 13, 12));
+      component.events.set([
+        { ...event('DEADLINE'), id: 'quiz', allDay: true, canvasStartDate: '2026-09-13' },
+        { ...event('DEADLINE'), id: 'done', allDay: true, canvasStartDate: '2026-09-13', canvasCompleted: true },
+        { ...event('DEADLINE'), id: 'old', allDay: true, canvasStartDate: '2026-08-01' },
+      ]);
+      component.view.set('today'); expect(component.canvasAssignments().map(e => e.id)).toEqual(['quiz']);
+      component.view.set('overdue'); expect(component.canvasAssignments().map(e => e.id)).toEqual(['old']);
+      component.view.set('completed'); expect(component.canvasAssignments().map(e => e.id)).toEqual(['done']);
+    } finally { jasmine.clock().uninstall(); }
+  });
+});

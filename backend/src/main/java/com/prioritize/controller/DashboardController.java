@@ -21,7 +21,11 @@ public class DashboardController {
     }
 
     @GetMapping("/summary")
-    public DashboardSummaryResponse summary() {
-        return dashboardService.summary(currentUserService.requireCurrentUserId());
+    public DashboardSummaryResponse summary(@org.springframework.web.bind.annotation.RequestParam(defaultValue = "UTC") String timeZone) {
+        try {
+            return dashboardService.summary(currentUserService.requireCurrentUserId(), java.time.ZoneId.of(timeZone));
+        } catch (java.time.DateTimeException ex) {
+            throw new com.prioritize.exception.ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "Invalid timezone");
+        }
     }
 }
