@@ -114,8 +114,12 @@ export class TodayComponent implements OnInit, AfterViewChecked {
       .sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
   });
 
+  readonly untimedCanvas = computed(() => this.events().filter(event =>
+    event.canvasKind === 'DEADLINE' && event.allDay && !event.canvasCompleted &&
+    event.canvasStartDate === toLocalDateKey(this.viewDate())));
+
   readonly hasAnything = computed(
-    () => this.timelineItems().length > 0 || this.unscheduledTasks().length > 0,
+    () => this.timelineItems().length > 0 || this.unscheduledTasks().length > 0 || this.untimedCanvas().length > 0,
   );
 
   readonly editingEvent = computed(() => {
@@ -268,6 +272,8 @@ export class TodayComponent implements OnInit, AfterViewChecked {
   }
 
   formatTimeLabel(item: TimelineItem): string {
+    const event = this.events().find(event => event.id === item.eventId);
+    if (event?.canvasKind === 'DEADLINE') return `Due ${this.formatTime(item.start)}`;
     if (item.kind === 'task') {
       return this.formatTime(item.start);
     }
@@ -355,6 +361,7 @@ function buildTimelineItems(
   const items: TimelineItem[] = [];
 
   for (const event of events) {
+    if (event.canvasKind === 'DEADLINE' && (event.allDay || event.canvasCompleted)) continue;
     if (!instantOverlapsDay(event.startAt, event.endAt, dayKey)) {
       continue;
     }

@@ -89,4 +89,24 @@ class CanvasFeedIntegrationTest {
         assertEquals(1,events.findByUserIdAndCanvasKeyIsNotNull(owner).size());
         service.disconnect(owner);assertFalse(service.status(owner).connected());assertTrue(events.findByUserIdAndCanvasKeyIsNotNull(owner).isEmpty());
     }
+
+    @Test void exactDeadlineSurvivesSyncAndUsesTheNewSourceDateAcrossDst() throws Exception {
+        when(client.fetch(any())).thenReturn(CanvasFeedParserTest.calendar(CanvasFeedParserTest.event("event-assignment-1","Quiz","DTSTART;VALUE=DATE:20260913")));
+        service.connect(owner,url,"America/Chicago");
+        UUID id=events.findByUserIdAndCanvasKeyIsNotNull(owner).getFirst().getId();
+        String path="/api/integrations/canvas/assignments/"+id+"/deadline-time";
+        String body="{\"time\":\"23:59\",\"timezone\":\"America/Chicago\"}";
+        mvc.perform(put(path).header("Authorization","Bearer "+otherToken).contentType("application/json").content(body)).andExpect(status().isNotFound());
+        mvc.perform(put(path).header("Authorization","Bearer "+token).contentType("application/json").content("{}")).andExpect(status().isBadRequest());
+        mvc.perform(put(path).header("Authorization","Bearer "+token).contentType("application/json").content(body))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.allDay").value(false))
+            .andExpect(jsonPath("$.startAt").value("2026-09-14T04:59:00Z"));
+        ready();
+        when(client.fetch(any())).thenReturn(CanvasFeedParserTest.calendar(CanvasFeedParserTest.event("event-assignment-1","Quiz revised","DTSTART;VALUE=DATE:20261102")));
+        service.sync(owner,false);
+        var event=events.findById(id).orElseThrow();
+        assertEquals(Instant.parse("2026-11-03T05:59:00Z"),event.getStartAt());
+        assertFalse(event.isAllDay());
+        assertThrows(RuntimeException.class,()->service.setDeadlineTime(owner,id,java.time.LocalTime.NOON,"invalid"));
+    }
 }

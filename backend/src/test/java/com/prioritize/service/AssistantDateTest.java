@@ -97,8 +97,8 @@ class AssistantDateTest {
         ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
         verify(llm).complete(messages.capture(), any());
         assertThat(messages.getValue().getFirst().get("content").toString())
-                .contains("Quiz 3 [DUE TODAY, due 2026-09-05 (all day)]",
-                        "Completed quiz [COMPLETED, due 2026-09-05 (all day)]",
+                .contains("Quiz 3 [DUE TODAY, due 2026-09-05 (time not provided by Canvas; do not assume midnight or 11:59 PM)]",
+                        "Completed quiz [COMPLETED, due 2026-09-05 (time not provided by Canvas; do not assume midnight or 11:59 PM)]",
                         "always check unfinished Canvas assignments due today");
     }
 }

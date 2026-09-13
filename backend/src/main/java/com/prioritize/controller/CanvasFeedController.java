@@ -8,6 +8,13 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/integrations/canvas")
 public class CanvasFeedController {
+    public record DeadlineTimeRequest(@jakarta.validation.constraints.NotNull java.time.LocalTime time,
+            @NotBlank @Size(max=64) String timezone) {}
+    @PutMapping("/assignments/{id}/deadline-time")
+    public com.prioritize.dto.CalendarEventResponse deadlineTime(@PathVariable java.util.UUID id,
+            @Valid @RequestBody DeadlineTimeRequest request) {
+        return service.setDeadlineTime(current.requireCurrentUserId(), id, request.time(), request.timezone());
+    }
     public record CompletionRequest(@jakarta.validation.constraints.NotNull Boolean completed) {}
     @PutMapping("/assignments/{id}/completion") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void complete(@PathVariable java.util.UUID id, @Valid @RequestBody CompletionRequest request) {

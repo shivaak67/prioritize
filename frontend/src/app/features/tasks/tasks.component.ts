@@ -410,7 +410,7 @@ export class TasksComponent implements OnInit {
   }
 
   formatEventWhen(event: CalendarEventDto): string {
-    if (event.allDay) return `${event.canvasStartDate ?? toDatetimeLocalValue(new Date(event.startAt)).slice(0, 10)} · All day`;
+    if (event.allDay) return `${event.canvasStartDate ?? toDatetimeLocalValue(new Date(event.startAt)).slice(0, 10)} · ${event.canvasKind === 'DEADLINE' ? 'Time not provided by Canvas' : 'All day'}`;
     const start = new Date(event.startAt);
     const end = new Date(event.endAt);
     const date = start.toLocaleDateString(undefined, {

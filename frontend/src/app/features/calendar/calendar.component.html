@@ -155,8 +155,8 @@
               </button>
               <p>Completion is tracked here only; it does not submit work or change Canvas.</p>
             }
-          @if (item.canvasStartDate) {
-            <p>All day · {{ item.canvasStartDate }}</p>
+          @if (item.allDay && item.canvasStartDate) {
+            <p>{{ item.canvasStartDate }} · {{ item.canvasKind === "DEADLINE" ? "Time not provided by Canvas" : "All day" }}</p>
           } @else {
             <p>
               {{ item.canvasKind === "DEADLINE" ? "Due" : "Starts" }}
@@ -165,6 +165,15 @@
                 · Ends {{ item.endAt | date: "medium" }}
               }
             </p>
+          }
+          @if (item.canvasKind === 'DEADLINE' && item.canvasStartDate) {
+            <div class="canvas-deadline-editor">
+              <label>Exact deadline time <input type="time" [(ngModel)]="deadlineTime" [disabled]="savingDeadline()" /></label>
+              <p>Timezone: {{ deadlineTimezone }}. Enter the time shown in Canvas. This stays in Prioritize through future syncs and does not change Canvas.</p>
+              <button type="button" mat-stroked-button (click)="saveDeadlineTime(item)" [disabled]="savingDeadline() || !deadlineTime">{{ savingDeadline() ? 'Saving…' : 'Save deadline time' }}</button>
+              <p>Existing reminders keep their scheduled times. Review them after saving a deadline.</p>
+              @if (deadlineMessage()) { <p role="status">{{ deadlineMessage() }}</p> }
+            </div>
           }
           @if (item.description) {
             <p class="canvas-description">{{ item.description }}</p>

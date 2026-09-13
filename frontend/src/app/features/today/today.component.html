@@ -42,6 +42,16 @@
     </button>
   </div>
 
+  @if (untimedCanvas().length) {
+    <section class="today__unscheduled surface">
+      <h3>Canvas assignments due {{ isToday() ? 'today' : 'on this date' }}</h3>
+      <p>Time not provided by Canvas. Check Canvas for the exact deadline.</p>
+      <ul class="today__task-list">
+        @for (item of untimedCanvas(); track item.id) { <li>{{ item.title }}</li> }
+      </ul>
+      <a routerLink="/calendar">Open Calendar to set an exact deadline time</a>
+    </section>
+  }
   @if (unscheduledTasks().length > 0) {
     <section class="today__unscheduled surface">
       <div class="surface__head">
