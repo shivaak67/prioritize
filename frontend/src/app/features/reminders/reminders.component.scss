@@ -230,3 +230,8 @@
 .reminders__choice { display: flex; gap: .75rem; align-items: flex-start; padding: .65rem .25rem; }
 .reminders__choice span { overflow-wrap: anywhere; }
 .reminders__choice input { flex-shrink: 0; margin-top: .2rem; }
+
+.reminders__actions { flex-wrap: wrap; }
+.reminders__choice-content { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .6rem; min-width: 0; }
+.reminders__badge { border-radius: 999px; padding: .15rem .55rem; background: #dcefed; color: #165953; font-size: .78rem; font-weight: 700; }
+.reminders__existing { flex-basis: 100%; color: var(--prio-ink-soft); font-size: .82rem; }

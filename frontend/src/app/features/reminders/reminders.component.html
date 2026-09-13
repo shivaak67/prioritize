@@ -52,6 +52,7 @@
           <legend>Choose assignments or events</legend>
           <div class="reminders__actions">
             <button mat-stroked-button type="button" (click)="selectAll()" [disabled]="!selectableItems().length">Select all</button>
+            <button mat-stroked-button type="button" (click)="selectWithoutReminders()" [disabled]="!selectableItems().length">Select without reminders</button>
             <button mat-stroked-button type="button" (click)="selectedIds.set([])" [disabled]="!selectedIds().length">Clear selection</button>
             <span role="status">{{ selectedIds().length }} selected</span>
           </div>
@@ -59,10 +60,23 @@
             @for (item of selectableItems(); track item.id) {
               <label class="reminders__choice">
                 <input type="checkbox" [checked]="selectedIds().includes(item.id)" (change)="toggleItem(item.id)" />
-                <span>{{ item.title }}</span>
+                <span class="reminders__choice-content">
+                  <span>{{ item.title }}</span>
+                  @if (existingReminders(item.id).length) {
+                    <span class="reminders__badge">Reminder set</span>
+                    @for (reminder of existingReminders(item.id); track reminder.id) {
+                      <small class="reminders__existing">{{ offsetLabel(reminder) }} · {{ channelLabel(reminder.channel) }}{{ reminder.status === 'PROCESSING' ? ' · Sending' : '' }}</small>
+                    }
+                  } @else {
+                    <small class="reminders__existing">No active reminders</small>
+                  }
+                </span>
               </label>
             } @empty { <p>No upcoming items of this type.</p> }
           </div>
+          @if (selectedWithReminders()) {
+            <p class="reminders__lede" role="status">{{ selectedWithReminders() }} selected item(s) already have reminders. Scheduling replaces their pending reminders with the times and channels chosen below. Messages already sending cannot be changed.</p>
+          }
         </fieldset>
         <div class="reminders__offsets">
           <span class="crud__field-label">Notify me</span>
