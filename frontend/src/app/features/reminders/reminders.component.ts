@@ -118,14 +118,10 @@ export class RemindersComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     this.saved.set(false);
-    const now = new Date();
-    const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const to = new Date(now.getFullYear(), now.getMonth() + 3, 0, 23, 59, 59).toISOString();
-
     forkJoin({
       reminders: this.api.listReminders(),
       tasks: this.api.listTasks(),
-      events: this.api.listCalendarEvents(from, to),
+      events: this.api.listCalendarEvents(),
       settings: this.api.getNotificationSettings(),
       phone: this.api.getPhoneStatus(),
     }).subscribe({
@@ -153,6 +149,26 @@ export class RemindersComponent implements OnInit {
   readonly selectedKind = signal<'TASK' | 'CALENDAR_EVENT'>('TASK');
   readonly scheduleMessage = signal<string | null>(null);
   readonly selectableItems = computed(() => this.selectedKind() === 'TASK' ? this.schedulableTasks() : this.upcomingEvents());
+
+  readonly activeByEntity = computed(() => {
+    const result = new Map<string, ReminderDto[]>();
+    for (const reminder of this.reminders()) {
+      if (reminder.status !== 'PENDING' && reminder.status !== 'PROCESSING') continue;
+      const key = `${reminder.relatedEntityType}:${reminder.relatedEntityId}`;
+      result.set(key, [...(result.get(key) ?? []), reminder]);
+    }
+    return result;
+  });
+  readonly selectedWithReminders = computed(() =>
+    this.selectedIds().filter(id => this.existingReminders(id).length > 0).length);
+
+  existingReminders(id: string): ReminderDto[] {
+    return this.activeByEntity().get(`${this.selectedKind()}:${id}`) ?? [];
+  }
+
+  selectWithoutReminders(): void {
+    this.selectedIds.set(this.selectableItems().filter(item => !this.existingReminders(item.id).length).map(item => item.id));
+  }
 
   toggleItem(id: string): void {
     this.selectedIds.update(ids => ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id]);
@@ -293,7 +309,7 @@ export class RemindersComponent implements OnInit {
       const eventAt = this.resolveEventAt(reminder);
       const eventAtLabel = eventAt
         ? eventAt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-        : 'Scheduled item';
+        : 'This item is no longer available in your calendar or tasks.';
 
       const existing = groups.get(key);
       if (existing) {
@@ -316,10 +332,10 @@ export class RemindersComponent implements OnInit {
 
   entityTitle(reminder: ReminderDto): string {
     if (reminder.relatedEntityType === 'TASK') {
-      return this.tasks().find((task) => task.id === reminder.relatedEntityId)?.title ?? 'Task';
+      return this.tasks().find((task) => task.id === reminder.relatedEntityId)?.title ?? 'Unavailable task';
     }
     if (reminder.relatedEntityType === 'CALENDAR_EVENT') {
-      return this.events().find((event) => event.id === reminder.relatedEntityId)?.title ?? 'Event';
+      return this.events().find((event) => event.id === reminder.relatedEntityId)?.title ?? 'Unavailable event';
     }
     return reminder.relatedEntityType;
   }
