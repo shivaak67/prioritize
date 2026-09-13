@@ -10,7 +10,7 @@ Refreshed September 9, 2026. Authenticated pages show the current application ru
 
 ### Dashboard
 
-See today's tasks and Canvas deadlines, weekly progress, and shortcuts to the AI assistant.
+Due Today, Overdue, This Week, and weekly progress include personal tasks and Canvas assignments, with completed assignments excluded from open counts. Dates use the user's timezone; date-only Canvas deadlines keep their original date. The AI assistant checks these assignments when recommending today's work.
 
 ![Dashboard with today's plan and weekly progress](docs/screenshots/dashboard.jpg)
 
@@ -253,18 +253,6 @@ This is the live topology verified on September 9, 2026. EBS persistence is sepa
 ## Analytics (Power BI)
 
 Power BI connects to PostgreSQL for completion rates, workload trends, and estimated vs actual time. Angular remains the interactive app UI.
-
-## Roadmap
-
-See [docs/architecture.md](docs/architecture.md) for MVP vs later and development phases.
-
-## Multi-agent development
-
-See [docs/multi-agent-workflow.md](docs/multi-agent-workflow.md).
-
-## License
-
-TBD
 
 ### Assignment and reminder controls
 

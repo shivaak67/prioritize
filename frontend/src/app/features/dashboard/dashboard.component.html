@@ -100,7 +100,7 @@
         <p class="dash__muted">Loading…</p>
       } @else {
         <p class="dash__progress-label">
-          {{ weeklyProgress().done }} / {{ weeklyProgress().total }} tasks
+          {{ weeklyProgress().done }} / {{ weeklyProgress().total }} tasks and assignments
         </p>
         <div class="dash__progress-bar" aria-hidden="true">
           @for (filled of progressSegments(); track $index) {

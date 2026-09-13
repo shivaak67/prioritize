@@ -161,9 +161,9 @@ export class ApiService {
 
   // --- Calendar events ---
 
-  listCalendarEvents(from: string, to: string): Observable<CalendarEventDto[]> {
+  listCalendarEvents(from?: string, to?: string): Observable<CalendarEventDto[]> {
     return this.http.get<CalendarEventDto[]>(`${this.base}/api/calendar-events`, {
-      params: { from, to },
+      params: from && to ? { from, to } : {},
     });
   }
 
@@ -305,7 +305,7 @@ export class ApiService {
   // --- Dashboard ---
 
   getDashboardSummary(): Observable<DashboardSummary> {
-    return this.http.get<DashboardSummary>(`${this.base}/api/dashboard/summary`);
+    return this.http.get<DashboardSummary>(`${this.base}/api/dashboard/summary`, { params: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } });
   }
 
   // --- AI assistant ---

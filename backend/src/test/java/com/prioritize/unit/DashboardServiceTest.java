@@ -34,12 +34,14 @@ class DashboardServiceTest {
     @Mock
     private ProjectRepository projectRepository;
 
+    @Mock
+    private com.prioritize.repository.CalendarEventRepository calendarRepository;
     private DashboardService dashboardService;
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-10T15:00:00Z"), ZoneOffset.UTC);
 
     @BeforeEach
     void setUp() {
-        dashboardService = new DashboardService(taskRepository, projectRepository, clock);
+        dashboardService = new DashboardService(taskRepository, projectRepository, calendarRepository, clock);
     }
 
     @Test
@@ -64,12 +66,12 @@ class DashboardServiceTest {
         DashboardSummaryResponse summary = dashboardService.summary(userId);
 
         assertThat(summary.dueTodayCount()).isEqualTo(1);
-        assertThat(summary.dueThisWeekCount()).isEqualTo(1);
+        assertThat(summary.dueThisWeekCount()).isEqualTo(2);
         assertThat(summary.overdueCount()).isEqualTo(1);
         assertThat(summary.highPriorityCount()).isEqualTo(2);
         assertThat(summary.completedCount()).isEqualTo(1);
         assertThat(summary.remainingCount()).isEqualTo(3);
-        assertThat(summary.estimatedHoursRemainingThisWeek()).isEqualTo(3.0);
+        assertThat(summary.estimatedHoursRemainingThisWeek()).isEqualTo(5.0);
         assertThat(summary.workloadByProject()).hasSize(1);
         assertThat(summary.workloadByProject().getFirst().taskCount()).isEqualTo(3);
         assertThat(summary.workloadByProject().getFirst().estimatedHours()).isEqualTo(13.0);
@@ -87,5 +89,26 @@ class DashboardServiceTest {
         task.setPriority(priority);
         task.setStatus(TaskStatus.TODO);
         return task;
+    }
+
+    @Test
+    void canvasCountsUseLocalDatesAndCompletionWithoutCountingEvents() {
+        UUID userId = UUID.randomUUID();
+        var quiz = new com.prioritize.model.CalendarEvent();
+        quiz.setCanvasKind("DEADLINE"); quiz.setAllDay(true);
+        quiz.setCanvasStartDate(LocalDate.parse("2026-09-10"));
+        quiz.setStartAt(Instant.parse("2026-09-11T00:00:00Z"));
+        var timed = new com.prioritize.model.CalendarEvent();
+        timed.setCanvasKind("DEADLINE"); timed.setStartAt(Instant.parse("2026-09-10T14:00:00Z"));
+        var meeting = new com.prioritize.model.CalendarEvent(); meeting.setCanvasKind("EVENT");
+        when(calendarRepository.findByUserIdAndCanvasKeyIsNotNull(userId)).thenReturn(List.of(quiz, timed, meeting));
+        var result = dashboardService.summary(userId, java.time.ZoneId.of("America/Chicago"));
+        assertThat(result.dueTodayCount()).isEqualTo(2);
+        assertThat(result.overdueCount()).isEqualTo(1);
+        assertThat(result.remainingCount()).isEqualTo(2);
+        quiz.setCanvasCompleted(true);
+        result = dashboardService.summary(userId, java.time.ZoneId.of("America/Chicago"));
+        assertThat(result.dueTodayCount()).isEqualTo(1);
+        assertThat(result.completedCount()).isEqualTo(1);
     }
 }
