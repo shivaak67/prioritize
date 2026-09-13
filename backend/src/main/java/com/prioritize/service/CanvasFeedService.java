@@ -75,6 +75,20 @@ public class CanvasFeedService {
         event.setCanvasCompleted(completed);
         events.save(event);
     }
+    public com.prioritize.dto.CalendarEventResponse setDeadlineTime(UUID userId, UUID eventId, LocalTime time, String timezone) {
+        lock(userId);
+        CalendarEvent event = events.findByIdAndUserId(eventId, userId)
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Assignment not found."));
+        if (event.getCanvasKey() == null || !"DEADLINE".equals(event.getCanvasKind()) || event.getCanvasStartDate() == null)
+            throw new ApiException(HttpStatus.CONFLICT, "Only Canvas assignments with a date-only feed can have a local deadline time.");
+        try { ZoneId.of(timezone); }
+        catch (Exception e) { throw new ApiException(HttpStatus.BAD_REQUEST, "Choose a valid timezone."); }
+        event.setCanvasDueTime(time);
+        event.setCanvasDueZone(timezone);
+        events.save(event);
+        return new com.prioritize.mapper.CalendarEventMapper().toResponse(event);
+    }
+
     private void apply(UUID userId, CanvasCalendarFeed feed, List<CanvasFeedParser.Item> items) {
         Map<String,CalendarEvent> old=new HashMap<>();
         events.findByUserIdAndCanvasKeyIsNotNull(userId).forEach(e->old.put(e.getCanvasKey(),e));

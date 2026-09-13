@@ -133,7 +133,7 @@ export class DashboardComponent implements OnInit {
       items.push({
         id: `event-${event.id}`,
         kind: 'event',
-        time: (event.canvasKind === 'DEADLINE' ? 'Due ' : '') + (event.allDay ? 'All day' : formatTime(start)),
+        time: (event.canvasKind === 'DEADLINE' ? 'Due ' : '') + (event.allDay ? (event.canvasKind === 'DEADLINE' ? 'today · Time not provided by Canvas' : 'All day') : formatTime(start)),
         endTime: event.allDay || event.canvasKind === 'DEADLINE' ? undefined : formatTime(end),
         title: event.title,
         subtitle: event.canvasKind === 'DEADLINE' ? 'Canvas assignment' : event.description ?? undefined,

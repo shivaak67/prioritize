@@ -78,6 +78,24 @@ export class CalendarComponent implements OnInit, OnDestroy {
 
   readonly selectedDay = signal<string | null>(null);
   readonly canvasDetail = signal<CalendarEventDto | null>(null);
+  deadlineTime = '';
+  readonly savingDeadline = signal(false);
+  readonly deadlineMessage = signal('');
+  readonly deadlineTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  saveDeadlineTime(item: CalendarEventDto): void {
+    if (this.savingDeadline() || !/^\d{2}:\d{2}$/.test(this.deadlineTime)) return;
+    this.savingDeadline.set(true);
+    this.deadlineMessage.set('');
+    this.api.setCanvasDeadlineTime(item.id, this.deadlineTime, this.deadlineTimezone).subscribe({
+      next: updated => {
+        this.events.update(list => list.map(event => event.id === updated.id ? updated : event));
+        if (this.canvasDetail()?.id === updated.id) this.canvasDetail.set(updated);
+        this.savingDeadline.set(false);
+        this.deadlineMessage.set('Deadline saved. Existing reminders keep their scheduled times; review them in Reminders.');
+      },
+      error: () => { this.savingDeadline.set(false); this.deadlineMessage.set('Could not save the deadline. Please try again.'); },
+    });
+  }
   readonly completingCanvas = signal(false);
   toggleCanvasComplete(item: CalendarEventDto): void {
     if (item.canvasKind !== 'DEADLINE' || this.completingCanvas()) return;
@@ -188,6 +206,8 @@ export class CalendarComponent implements OnInit, OnDestroy {
       if (!event) return;
       if (event.canvasKind) {
         this.canvasDetail.set(event);
+        this.deadlineTime = event.allDay ? '' : localInput(new Date(event.startAt)).slice(11, 16);
+        this.deadlineMessage.set('');
         this.editor.set(null);
         this.revealPanel();
         return;

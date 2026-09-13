@@ -16,7 +16,7 @@ Due Today, Overdue, This Week, and weekly progress include personal tasks and Ca
 
 ### Canvas assignments
 
-Imported assignments have their own section, separate from events and time blocks. Mark an assignment **Complete** or **Reopen** it. Completion is saved in Prioritize and survives feed refreshes; it does not submit work or change Canvas.
+Imported assignments have their own section, separate from events and time blocks. Mark an assignment **Complete** or **Reopen** it. Completion is saved in Prioritize and survives feed refreshes; it does not submit work or change Canvas. Date-only deadlines clearly say the time was not provided by Canvas. In Calendar, enter an exact local deadline time; it survives refreshes and is used for planning, AI context, and new reminders. Previously scheduled reminders keep their times and can be reviewed in Reminders.
 
 ![Canvas assignments with Complete and Reopen controls](docs/screenshots/canvas-assignments.jpg)
 
