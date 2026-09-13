@@ -54,7 +54,7 @@ describe('Task discovery', () => {
     expect(component.upcomingEvents().map(e => e.id)).toEqual(['event']);
     expect(component.canvasAssignments().map(e => e.id)).toEqual(['due']);
     expect(component.canvasEvents().map(e => e.id)).toEqual(['meeting']);
-    expect(component.formatEventWhen({ ...event('DEADLINE'), allDay: true, canvasStartDate: '2026-09-16' })).toBe('2026-09-16 · All day');
+    expect(component.formatEventWhen({ ...event('DEADLINE'), allDay: true, canvasStartDate: '2026-09-16' })).toBe('2026-09-16 · Time not provided by Canvas');
     expect(component.formatEventWhen(event('DEADLINE'))).not.toContain('–');
   });
   it('edits blocks while preserving metadata, and rejects invalid ranges', () => {

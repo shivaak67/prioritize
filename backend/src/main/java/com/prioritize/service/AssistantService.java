@@ -232,7 +232,7 @@ public class AssistantService {
             if (!event.canvasCompleted() && !event.allDay() && event.startAt().isBefore(now)) state += " / OVERDUE";
             sb.append("- [id=").append(event.id()).append("] ").append(event.title())
                     .append(" [").append(state).append(", due ").append(due)
-                    .append(event.allDay() ? " (all day)" : " at " + TIME_RANGE_FORMAT.withZone(zone).format(event.startAt()))
+                    .append(event.allDay() ? " (time not provided by Canvas; do not assume midnight or 11:59 PM)" : " at " + TIME_RANGE_FORMAT.withZone(zone).format(event.startAt()))
                     .append("]\n");
         }
         sb.append('\n');

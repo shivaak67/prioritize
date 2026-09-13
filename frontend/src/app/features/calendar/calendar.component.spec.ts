@@ -13,7 +13,7 @@ describe('Interactive calendar', () => {
       'listCalendarEvents',
       'updateTask',
       'createCalendarEvent',
-      'updateCalendarEvent',
+      'updateCalendarEvent', 'setCanvasDeadlineTime',
     ]);
     api.listTasks.and.returnValue(of([]));
     api.listCalendarEvents.and.returnValue(of([]));
@@ -122,4 +122,19 @@ describe('Interactive calendar', () => {
     event.endAt = new Date(2026, 8, 10, 0).toISOString();
     expect(eventDayKeys(event)).toEqual(['2026-09-09']);
   });
+  it('saves a local deadline and keeps the imported item after a failed save', () => {
+    const original = { id: 'quiz', allDay: true, canvasKind: 'DEADLINE', canvasStartDate: '2026-09-13' } as CalendarEventDto;
+    const updated = { ...original, allDay: false, startAt: '2026-09-14T04:59:00Z' };
+    component.events.set([original]); component.canvasDetail.set(original);
+    component.deadlineTime = '23:59';
+    api.setCanvasDeadlineTime.and.returnValue(throwError(() => new Error('offline')));
+    component.saveDeadlineTime(original);
+    expect(component.canvasDetail()).toEqual(original);
+    expect(component.savingDeadline()).toBeFalse();
+    api.setCanvasDeadlineTime.and.returnValue(of(updated)); component.saveDeadlineTime(original);
+    expect(api.setCanvasDeadlineTime).toHaveBeenCalledWith('quiz', '23:59', component.deadlineTimezone);
+    expect(component.events()[0].allDay).toBeFalse();
+    expect(component.deadlineMessage()).toContain('Existing reminders');
+  });
+
 });

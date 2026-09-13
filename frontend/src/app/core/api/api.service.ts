@@ -54,6 +54,10 @@ export class ApiService {
   getCanvasFeed(): Observable<CanvasFeedStatus> {
     return this.http.get<CanvasFeedStatus>(`${this.base}/api/integrations/canvas`);
   }
+  setCanvasDeadlineTime(id: string, time: string, timezone: string): Observable<CalendarEventDto> {
+    return this.http.put<CalendarEventDto>(`${this.base}/api/integrations/canvas/assignments/${id}/deadline-time`, { time, timezone });
+  }
+
   setCanvasAssignmentCompleted(id: string, completed: boolean): Observable<void> {
     return this.http.put<void>(`${this.base}/api/integrations/canvas/assignments/${id}/completion`, { completed });
   }

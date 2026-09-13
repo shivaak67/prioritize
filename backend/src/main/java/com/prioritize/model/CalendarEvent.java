@@ -18,6 +18,16 @@ public class CalendarEvent {
     public boolean isCanvasCompleted() { return canvasCompleted; }
     public void setCanvasCompleted(boolean value) { canvasCompleted = value; }
 
+    @Column(name = "canvas_due_time")
+    private java.time.LocalTime canvasDueTime;
+    @Column(name = "canvas_due_zone")
+    private String canvasDueZone;
+    public void setCanvasDueTime(java.time.LocalTime value) { canvasDueTime = value; }
+    public void setCanvasDueZone(String value) { canvasDueZone = value; }
+    private boolean hasDeadlineOverride() {
+        return canvasDueTime != null && canvasDueZone != null && canvasStartDate != null && "DEADLINE".equals(canvasKind);
+    }
+
     @Id
     private UUID id;
 
@@ -125,7 +135,7 @@ public class CalendarEvent {
     }
 
     public Instant getStartAt() {
-        return startAt;
+        return hasDeadlineOverride() ? canvasStartDate.atTime(canvasDueTime).atZone(java.time.ZoneId.of(canvasDueZone)).toInstant() : startAt;
     }
 
     public void setStartAt(Instant startAt) {
@@ -133,7 +143,7 @@ public class CalendarEvent {
     }
 
     public Instant getEndAt() {
-        return endAt;
+        return hasDeadlineOverride() ? getStartAt().plusSeconds(60) : endAt;
     }
 
     public void setEndAt(Instant endAt) {
@@ -141,7 +151,7 @@ public class CalendarEvent {
     }
 
     public boolean isAllDay() {
-        return allDay;
+        return allDay && !hasDeadlineOverride();
     }
 
     public void setAllDay(boolean allDay) {
