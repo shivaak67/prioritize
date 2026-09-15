@@ -1,83 +1,60 @@
 # Prioritize
 
-Personal productivity and planning platform. Organize work as Goals → Projects → Tasks, block time on a schedule, manage calendar events and routines, and track progress with reminders, insights, and time entries.
+AI-powered productivity and academic planning platform with Canvas Calendar Feed integration. Organize work as Goals → Projects → Tasks, block time on a schedule, manage calendar events and routines, and track progress with reminders, insights, and time entries.
 
 ## Screenshots
 
-**Live app:** [theprioritize.com](https://theprioritize.com/) · **Default branch / current release:** [main](https://github.com/shivaak67/prioritize/tree/main)
+**Live app:** [theprioritize.com](https://theprioritize.com/) · **Default branch:** [main](https://github.com/shivaak67/prioritize/tree/main)
 
-Refreshed September 9, 2026. Authenticated pages show the current application running locally with a fictional account and synthetic tasks and Canvas data. The sign-in capture is from the live app. No private feed links or real account data are shown.
+Captured from the deployed application on September 15, 2026. These are live app screens; account contact information and private Canvas feed URLs are excluded.
 
-### Dashboard
+### Ask AI — plan with your actual tasks and Canvas deadlines
 
-Due Today, Overdue, This Week, and weekly progress include personal tasks and Canvas assignments, with completed assignments excluded from open counts. Dates use the user's timezone; date-only Canvas deadlines keep their original date. The AI assistant checks these assignments when recommending today's work.
+Ask natural-language questions about your workload, deadlines, and schedule. The OpenAI-powered assistant uses your task and calendar context, including imported Canvas assignments, and can create or update tasks and events. Below, it retrieves today's Canvas assignments and their exact due times.
 
-![Dashboard with today's plan and weekly progress](docs/screenshots/dashboard.jpg)
+![Live AI assistant answering a question about Canvas deadlines](docs/screenshots/ai-live.png)
 
-### Canvas assignments
+### Dashboard — see what needs attention
 
-Imported assignments have their own section, separate from events and time blocks. Mark an assignment **Complete** or **Reopen** it. Completion is saved in Prioritize and survives feed refreshes; it does not submit work or change Canvas. Date-only deadlines clearly say the time was not provided by Canvas. In Calendar, enter an exact local deadline time; it survives refreshes and is used for planning, AI context, and new reminders. Previously scheduled reminders keep their times and can be reviewed in Reminders.
+Due Today, Overdue, This Week, and weekly assignment progress combine personal tasks and Canvas assignments. Today's plan shows upcoming deadlines with direct access to the AI assistant.
 
-![Canvas assignments with Complete and Reopen controls](docs/screenshots/canvas-assignments.jpg)
+![Live dashboard with today's Canvas deadlines and AI shortcuts](docs/screenshots/dashboard-live.png)
 
-### Canvas discovery and setup
+### Tasks and Canvas assignments
 
-A dashboard card helps new users discover the import. Settings walks them through **Canvas → Calendar → Calendar Feed**, timezone selection, and connection. No developer key is required.
+Search and filter your work, edit personal tasks, and mark Canvas assignments complete or reopen them. Canvas completion is tracked in Prioritize only; it does not submit work or change Canvas. Date-only deadlines say when Canvas has not provided a time; you can enter an exact local deadline in Calendar.
 
-![Canvas discovery card with three setup steps](docs/screenshots/canvas-welcome.jpg)
+![Live tasks and Canvas assignments with completion controls](docs/screenshots/tasks-live.png)
 
-![Canvas Calendar Feed setup instructions](docs/screenshots/canvas-settings.jpg)
+### Calendar — your deadlines and plans together
 
-### Tasks and calendar planning
+See personal tasks, editable time blocks, Canvas assignments, and course events in one calendar.
 
-Create tasks with due dates and priorities, filter existing work, and reserve study time. The calendar brings personal tasks, editable time blocks, and imported Canvas deadlines together.
+![Live calendar showing Canvas deadlines and personal events](docs/screenshots/calendar-live.png)
 
-![Task creation, time blocks, and task filters](docs/screenshots/tasks.jpg)
+### Reminders — see what is already scheduled
 
-![Calendar with tasks and Canvas assignments](docs/screenshots/calendar.jpg)
+Existing reminders are marked beside each assignment or event, including timing and channel. Select several items, select all, or select only items without reminders. Recent activity can be cleared separately from pending reminders.
 
-<details>
-<summary>See time-block editing and Canvas assignment details</summary>
+![Live reminder selection with Reminder set badges and notification times](docs/screenshots/reminders-live.png)
 
-![Editing a personal time block](docs/screenshots/calendar-edit.jpg)
+### Insights — one weekly total
 
-![Canvas assignment details and local completion status](docs/screenshots/canvas-calendar.jpg)
+Tasks, Canvas assignments, calendar events, and time blocks contribute to the same weekly progress total. Tasks and assignments count when marked complete; events count once their end time has elapsed. Logged focus time remains a measure of recorded work.
 
-</details>
+![Live Insights with combined task assignment and event progress](docs/screenshots/insights-live.png)
 
-### Reminders
+### Focus — turn plans into study time
 
-Select several assignments or use **Select all** to schedule reminders together. **Clear history** clears recent activity from view while keeping pending reminders.
+Choose a task and a study duration, then start a timer or use the stopwatch to log focused work.
 
-![Selecting multiple Canvas assignments and events for reminders](docs/screenshots/reminder-selection.jpg)
+![Live Focus timer with study session options](docs/screenshots/focus-live.png)
 
-<details>
-<summary>See reminder history controls</summary>
+### Canvas connection — no developer key required
 
-![Recent reminder activity with Clear history](docs/screenshots/reminder-history.jpg)
+Settings guides users through Canvas → Calendar → Calendar Feed. The read-only connection imports deadlines and events and refreshes automatically. The connected account below has 64 imported items.
 
-</details>
-
-### Focus timer
-
-Choose a task and a study duration, then start a timed session or use the stopwatch to log focused work.
-
-![Focus timer with a selected task and session duration](docs/screenshots/focus.jpg)
-
-### Getting started and public pages
-
-The guided first session helps users create a task, reserve time, and start Focus. The home URL opens your dashboard when signed in, or sign-in when signed out. Sign-in supports email/password and Google.
-
-<details>
-<summary>See the first-session guide and sign-in</summary>
-
-![Guided first planning session](docs/screenshots/onboarding.jpg)
-
-
-
-![Prioritize sign-in with Google option](docs/screenshots/sign-in.jpg)
-
-</details>
+![Live Canvas connection status and sync controls](docs/screenshots/canvas-settings-live.png)
 
 ## Overview
 
@@ -94,7 +71,8 @@ Prioritize helps you plan and execute work with a clear hierarchy: categories an
 - Schedule blocks (time-blocking) and personal calendar events
 - Recurring routines and occurrences
 - Reminders and in-app notifications
-- Time entries and insights summary: weekly completion includes tasks and Canvas assignments. Calendar events and time blocks have separate counts and scheduled hours; scheduled hours do not count as logged focus. Week boundaries follow the browser's time zone.
+- Time entries and insights summary: weekly progress combines tasks, Canvas assignments, calendar events, and time blocks. Tasks and assignments count when marked complete; events count after their end time has elapsed. Scheduled time does not count as logged focus. Week boundaries follow the browser's time zone.
+- OpenAI-powered assistant for task and calendar questions, creation, and updates
 - Dashboard overview
 - Power BI–ready PostgreSQL schema
 
