@@ -326,7 +326,7 @@ export class ApiService {
 
   getInsightsSummary(from: string, to: string): Observable<InsightsSummary> {
     return this.http.get<InsightsSummary>(`${this.base}/api/insights/summary`, {
-      params: { from, to },
+      params: { from, to, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
     });
   }
 }

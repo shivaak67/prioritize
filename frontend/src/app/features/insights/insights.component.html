@@ -4,7 +4,7 @@
       <p class="prio-kicker">Analytics</p>
       <h1 class="prio-title">Insights</h1>
       <p class="prio-lede">
-        Turn your task and focus data into useful weekly progress — see what you completed, where your time went, and how consistent you've been.
+        See your tasks, Canvas assignments, calendar events, and focus time together for the week.
       </p>
     </div>
     <div class="page__actions">
@@ -29,7 +29,7 @@
       <ul class="insights__stats">
         <li>
           <strong>{{ data.weeklyTasksCompleted }} / {{ data.weeklyTasksDue }}</strong>
-          <span>tasks completed</span>
+          <span>tasks and assignments completed</span>
         </li>
         <li>
           <strong>{{ weeklyCompletionRate() }}%</strong>
@@ -41,7 +41,7 @@
         </li>
         <li>
           <strong>🔥 {{ data.focusStreakDays }}-day streak</strong>
-          <span>active days in a row</span>
+          <span>consecutive days with task completion or logged focus</span>
         </li>
         <li>
           <strong>{{ data.mostProductiveDay ?? '—' }}</strong>
@@ -52,6 +52,18 @@
           <span>most worked-on category</span>
         </li>
       </ul>
+      <p class="insights__explanation">Completion includes tasks and Canvas assignments due this week. Canvas completion is tracked in Prioritize.</p>
+    </article>
+
+    <article class="surface insights__week">
+      <h2>Canvas and calendar</h2>
+      <ul class="insights__stats">
+        <li><strong>{{ data.canvasAssignmentsCompleted }} / {{ data.canvasAssignmentsDue }}</strong><span>Canvas assignments completed</span></li>
+        <li><strong>{{ data.calendarEvents }}</strong><span>scheduled events and time blocks</span></li>
+        <li><strong>{{ data.canvasEvents }}</strong><span>of those imported from Canvas</span></li>
+        <li><strong>{{ formatFocusedMinutes(data.scheduledMinutes) }}</strong><span>scheduled event time</span></li>
+      </ul>
+      <p class="insights__explanation">Scheduled time adds up timed events within this week, including overlapping events. All-day events count as events but add no hours. Events are not marked completed automatically and scheduled time is separate from logged focus time.</p>
     </article>
 
     <div class="insights__columns">
