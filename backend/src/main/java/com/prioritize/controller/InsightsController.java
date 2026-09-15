@@ -26,8 +26,13 @@ public class InsightsController {
 
     @GetMapping("/summary")
     public InsightsSummaryResponse summary(
-            @RequestParam Instant from, @RequestParam Instant to) {
+            @RequestParam Instant from, @RequestParam Instant to,
+            @RequestParam(defaultValue = "UTC") String timeZone) {
         UUID userId = currentUserService.requireCurrentUserId();
-        return insightsService.summary(userId, from, to);
+        try {
+            return insightsService.summary(userId, from, to, java.time.ZoneId.of(timeZone));
+        } catch (java.time.DateTimeException ex) {
+            throw new com.prioritize.exception.ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "Invalid time zone");
+        }
     }
 }

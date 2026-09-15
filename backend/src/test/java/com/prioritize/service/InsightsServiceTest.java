@@ -43,11 +43,14 @@ class InsightsServiceTest {
     @Mock
     private TimeEntryRepository timeEntryRepository;
 
+    @Mock
+    private com.prioritize.repository.CalendarEventRepository calendarEventRepository;
+
     private InsightsService insightsService;
 
     @BeforeEach
     void setUp() {
-        insightsService = new InsightsService(taskRepository, timeEntryRepository);
+        insightsService = new InsightsService(taskRepository, timeEntryRepository, calendarEventRepository);
     }
 
     @Test
@@ -171,6 +174,70 @@ class InsightsServiceTest {
 
     private void stubEmptyAggregates() {
         stubEmptyAggregates(FROM, TO);
+    }
+
+    @Test
+    void includesCanvasDeadlinesAndClipsEventsWithoutInflatingFocus() {
+        stubEmptyAggregates();
+        var deadline = event("DEADLINE", FROM.plusSeconds(60), FROM.plusSeconds(61));
+        deadline.setCanvasCompleted(true);
+        var dateOnly = event("DEADLINE", FROM.minusSeconds(3600), FROM.plusSeconds(1));
+        dateOnly.setAllDay(true);
+        dateOnly.setCanvasStartDate(LocalDate.of(2026, 1, 1));
+        var outside = event("DEADLINE", TO, TO.plusSeconds(1));
+        var manual = event(null, FROM.minusSeconds(3600), FROM.plusSeconds(1800));
+        var canvas = event("EVENT", TO.minusSeconds(3600), TO.plusSeconds(3600));
+        var allDay = event("EVENT", FROM, TO);
+        allDay.setAllDay(true);
+        when(calendarEventRepository.findByUserIdOrderByStartAtAsc(USER_ID))
+                .thenReturn(List.of(deadline, dateOnly, outside, manual, canvas, allDay));
+        var result = insightsService.summary(USER_ID, FROM, TO, java.time.ZoneId.of("UTC"));
+        assertThat(result.weeklyTasksDue()).isEqualTo(2);
+        assertThat(result.weeklyTasksCompleted()).isEqualTo(1);
+        assertThat(result.canvasAssignmentsDue()).isEqualTo(2);
+        assertThat(result.canvasAssignmentsCompleted()).isEqualTo(1);
+        assertThat(result.calendarEvents()).isEqualTo(3);
+        assertThat(result.canvasEvents()).isEqualTo(2);
+        assertThat(result.scheduledMinutes()).isEqualTo(90);
+        assertThat(result.totalMinutesLogged()).isZero();
+        verify(calendarEventRepository).findByUserIdOrderByStartAtAsc(USER_ID);
+    }
+
+    private com.prioritize.model.CalendarEvent event(String kind, Instant start, Instant end) {
+        var event = new com.prioritize.model.CalendarEvent();
+        event.setUserId(USER_ID);
+        event.setCanvasKind(kind);
+        event.setStartAt(start);
+        event.setEndAt(end);
+        return event;
+    }
+
+    @Test
+    void usesLocalWeekAndEffectiveDeadlineOverridesAndExcludesCancelledTasks() {
+        Instant from = Instant.parse("2026-09-14T05:00:00Z");
+        Instant to = Instant.parse("2026-09-21T05:00:00Z");
+        stubEmptyAggregates(from, to);
+        var task = new com.prioritize.model.Task();
+        task.setDueDate(LocalDate.of(2026, 9, 14));
+        task.setStatus(TaskStatus.COMPLETED);
+        var cancelled = new com.prioritize.model.Task();
+        cancelled.setDueDate(LocalDate.of(2026, 9, 14));
+        cancelled.setStatus(TaskStatus.CANCELLED);
+        when(taskRepository.findFiltered(USER_ID, null, null, null)).thenReturn(List.of(task, cancelled));
+        var overridden = event("DEADLINE", to, to.plusSeconds(1));
+        overridden.setCanvasStartDate(LocalDate.of(2026, 9, 20));
+        overridden.setCanvasDueTime(java.time.LocalTime.of(23, 59));
+        overridden.setCanvasDueZone("America/Chicago");
+        overridden.setCanvasCompleted(true);
+        var nextWeek = event("DEADLINE", to.minusSeconds(3600), to);
+        nextWeek.setAllDay(true);
+        nextWeek.setCanvasStartDate(LocalDate.of(2026, 9, 21));
+        when(calendarEventRepository.findByUserIdOrderByStartAtAsc(USER_ID)).thenReturn(List.of(overridden, nextWeek));
+        var result = insightsService.summary(USER_ID, from, to, java.time.ZoneId.of("America/Chicago"));
+        assertThat(result.weeklyTasksDue()).isEqualTo(2);
+        assertThat(result.weeklyTasksCompleted()).isEqualTo(2);
+        assertThat(result.canvasAssignmentsDue()).isEqualTo(1);
+        assertThat(result.calendarEvents()).isZero();
     }
 
     private void stubEmptyAggregates(Instant from, Instant to) {

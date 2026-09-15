@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.prioritize.dto.InsightsSummaryResponse;
 import com.prioritize.exception.ApiException;
 import com.prioritize.model.Task;
+import com.prioritize.model.CalendarEvent;
+import com.prioritize.repository.CalendarEventRepository;
 import com.prioritize.model.TaskStatus;
 import com.prioritize.repository.TaskRepository;
 import com.prioritize.repository.TimeEntryRepository;
@@ -43,13 +45,20 @@ public class InsightsService {
 
     private final TaskRepository taskRepository;
     private final TimeEntryRepository timeEntryRepository;
+    private final CalendarEventRepository calendarEventRepository;
 
-    public InsightsService(TaskRepository taskRepository, TimeEntryRepository timeEntryRepository) {
+    public InsightsService(TaskRepository taskRepository, TimeEntryRepository timeEntryRepository,
+            CalendarEventRepository calendarEventRepository) {
         this.taskRepository = taskRepository;
         this.timeEntryRepository = timeEntryRepository;
+        this.calendarEventRepository = calendarEventRepository;
     }
 
     public InsightsSummaryResponse summary(UUID userId, Instant from, Instant to) {
+        return summary(userId, from, to, DISPLAY_ZONE);
+    }
+
+    public InsightsSummaryResponse summary(UUID userId, Instant from, Instant to, ZoneId zone) {
         validateWindow(from, to);
 
         // Half-open window [from, to) for created/completed/logged aggregations.
@@ -69,17 +78,18 @@ public class InsightsService {
 
         double completionRate = (double) tasksCompleted / Math.max(tasksCreated, 1);
 
-        List<InsightsSummaryResponse.MinutesByDay> minutesByDay = buildMinutesByDay(userId, from, to);
+        List<InsightsSummaryResponse.MinutesByDay> minutesByDay = buildMinutesByDay(userId, from, to, zone);
         List<InsightsSummaryResponse.TaskMinutes> topTasks = buildTopTasks(userId, from, to);
 
         List<Task> tasks = taskRepository.findFiltered(userId, null, null, null);
-        LocalDate today = LocalDate.now(DISPLAY_ZONE);
-        LocalDate weekStart = today.with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = weekStart.plusDays(7);
+        LocalDate today = LocalDate.now(zone);
+        LocalDate weekStart = from.atZone(zone).toLocalDate();
+        LocalDate weekEnd = to.atZone(zone).toLocalDate();
 
         int weeklyTasksDue = 0;
         int weeklyTasksCompleted = 0;
         for (Task task : tasks) {
+            if (task.getStatus() == TaskStatus.CANCELLED) continue;
             if (task.getDueDate() == null) {
                 continue;
             }
@@ -92,7 +102,39 @@ public class InsightsService {
             }
         }
 
-        int focusStreakDays = computeFocusStreak(tasks, minutesByDay, today);
+        int canvasAssignmentsDue = 0;
+        int canvasAssignmentsCompleted = 0;
+        int calendarEvents = 0;
+        int canvasEvents = 0;
+        long scheduledMinutes = 0;
+        for (CalendarEvent event : calendarEventRepository.findByUserIdOrderByStartAtAsc(userId)) {
+            if ("DEADLINE".equals(event.getCanvasKind())) {
+                boolean inWindow = event.isAllDay() && event.getCanvasStartDate() != null
+                        ? !event.getCanvasStartDate().isBefore(weekStart) && event.getCanvasStartDate().isBefore(weekEnd)
+                        : !event.getStartAt().isBefore(from) && event.getStartAt().isBefore(to);
+                if (inWindow) {
+                    canvasAssignmentsDue++;
+                    if (event.isCanvasCompleted()) canvasAssignmentsCompleted++;
+                }
+            } else {
+                boolean overlaps = event.isAllDay() && event.getCanvasStartDate() != null
+                        ? event.getCanvasStartDate().isBefore(weekEnd)
+                            && (event.getCanvasEndDate() == null ? event.getCanvasStartDate().plusDays(1) : event.getCanvasEndDate()).isAfter(weekStart)
+                        : event.getStartAt().isBefore(to) && event.getEndAt().isAfter(from);
+                if (!overlaps) continue;
+                calendarEvents++;
+                if ("EVENT".equals(event.getCanvasKind())) canvasEvents++;
+                if (!event.isAllDay()) {
+                    Instant start = event.getStartAt().isBefore(from) ? from : event.getStartAt();
+                    Instant end = event.getEndAt().isAfter(to) ? to : event.getEndAt();
+                    scheduledMinutes += Math.max(0, ChronoUnit.MINUTES.between(start, end));
+                }
+            }
+        }
+        weeklyTasksDue += canvasAssignmentsDue;
+        weeklyTasksCompleted += canvasAssignmentsCompleted;
+
+        int focusStreakDays = computeFocusStreak(tasks, minutesByDay, today, zone);
         String mostProductiveDay = findMostProductiveDay(minutesByDay);
         String topCategoryName = findTopCategory(userId, from, to);
 
@@ -107,6 +149,11 @@ public class InsightsService {
                 completionRate,
                 weeklyTasksDue,
                 weeklyTasksCompleted,
+                canvasAssignmentsDue,
+                canvasAssignmentsCompleted,
+                calendarEvents,
+                canvasEvents,
+                toInt(scheduledMinutes),
                 focusStreakDays,
                 mostProductiveDay,
                 topCategoryName,
@@ -117,7 +164,7 @@ public class InsightsService {
     private int computeFocusStreak(
             List<Task> tasks,
             List<InsightsSummaryResponse.MinutesByDay> minutesByDay,
-            LocalDate today) {
+            LocalDate today, ZoneId zone) {
         Set<LocalDate> activeDays = new HashSet<>();
         for (InsightsSummaryResponse.MinutesByDay day : minutesByDay) {
             if (day.minutes() > 0) {
@@ -126,7 +173,7 @@ public class InsightsService {
         }
         for (Task task : tasks) {
             if (task.getCompletedAt() != null) {
-                activeDays.add(LocalDate.ofInstant(task.getCompletedAt(), DISPLAY_ZONE));
+                activeDays.add(LocalDate.ofInstant(task.getCompletedAt(), zone));
             }
         }
 
@@ -170,13 +217,13 @@ public class InsightsService {
     }
 
     private List<InsightsSummaryResponse.MinutesByDay> buildMinutesByDay(
-            UUID userId, Instant from, Instant to) {
+            UUID userId, Instant from, Instant to, ZoneId zone) {
         List<Object[]> rows = timeEntryRepository.findCreatedAtAndDurationInWindow(userId, from, to);
         Map<LocalDate, Integer> byDay = new LinkedHashMap<>();
         for (Object[] row : rows) {
             Instant createdAt = (Instant) row[0];
             int minutes = ((Number) row[1]).intValue();
-            LocalDate day = LocalDate.ofInstant(createdAt, DISPLAY_ZONE);
+            LocalDate day = LocalDate.ofInstant(createdAt, zone);
             byDay.merge(day, minutes, Integer::sum);
         }
         List<InsightsSummaryResponse.MinutesByDay> result = new ArrayList<>(byDay.size());
