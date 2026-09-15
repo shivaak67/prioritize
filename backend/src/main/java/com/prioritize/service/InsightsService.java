@@ -106,6 +106,8 @@ public class InsightsService {
         int canvasAssignmentsCompleted = 0;
         int calendarEvents = 0;
         int canvasEvents = 0;
+        int elapsedEvents = 0;
+        Instant now = Instant.now();
         long scheduledMinutes = 0;
         for (CalendarEvent event : calendarEventRepository.findByUserIdOrderByStartAtAsc(userId)) {
             if ("DEADLINE".equals(event.getCanvasKind())) {
@@ -123,6 +125,10 @@ public class InsightsService {
                         : event.getStartAt().isBefore(to) && event.getEndAt().isAfter(from);
                 if (!overlaps) continue;
                 calendarEvents++;
+                boolean elapsed = event.isAllDay() && event.getCanvasStartDate() != null
+                        ? !(event.getCanvasEndDate() == null ? event.getCanvasStartDate().plusDays(1) : event.getCanvasEndDate()).isAfter(today)
+                        : !event.getEndAt().isAfter(now);
+                if (elapsed) elapsedEvents++;
                 if ("EVENT".equals(event.getCanvasKind())) canvasEvents++;
                 if (!event.isAllDay()) {
                     Instant start = event.getStartAt().isBefore(from) ? from : event.getStartAt();
@@ -131,8 +137,8 @@ public class InsightsService {
                 }
             }
         }
-        weeklyTasksDue += canvasAssignmentsDue;
-        weeklyTasksCompleted += canvasAssignmentsCompleted;
+        weeklyTasksDue += canvasAssignmentsDue + calendarEvents;
+        weeklyTasksCompleted += canvasAssignmentsCompleted + elapsedEvents;
 
         int focusStreakDays = computeFocusStreak(tasks, minutesByDay, today, zone);
         String mostProductiveDay = findMostProductiveDay(minutesByDay);
