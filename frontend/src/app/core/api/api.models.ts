@@ -425,6 +425,11 @@ export interface InsightsSummary {
   completionRate: number;
   weeklyTasksDue: number;
   weeklyTasksCompleted: number;
+  canvasAssignmentsDue: number;
+  canvasAssignmentsCompleted: number;
+  calendarEvents: number;
+  canvasEvents: number;
+  scheduledMinutes: number;
   focusStreakDays: number;
   mostProductiveDay: string | null;
   topCategoryName: string | null;

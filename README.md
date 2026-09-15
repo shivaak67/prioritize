@@ -94,7 +94,7 @@ Prioritize helps you plan and execute work with a clear hierarchy: categories an
 - Schedule blocks (time-blocking) and personal calendar events
 - Recurring routines and occurrences
 - Reminders and in-app notifications
-- Time entries and insights summary
+- Time entries and insights summary: weekly completion includes tasks and Canvas assignments. Calendar events and time blocks have separate counts and scheduled hours; scheduled hours do not count as logged focus. Week boundaries follow the browser's time zone.
 - Dashboard overview
 - Power BI–ready PostgreSQL schema
 
