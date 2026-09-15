@@ -192,8 +192,8 @@ class InsightsServiceTest {
         when(calendarEventRepository.findByUserIdOrderByStartAtAsc(USER_ID))
                 .thenReturn(List.of(deadline, dateOnly, outside, manual, canvas, allDay));
         var result = insightsService.summary(USER_ID, FROM, TO, java.time.ZoneId.of("UTC"));
-        assertThat(result.weeklyTasksDue()).isEqualTo(2);
-        assertThat(result.weeklyTasksCompleted()).isEqualTo(1);
+        assertThat(result.weeklyTasksDue()).isEqualTo(5);
+        assertThat(result.weeklyTasksCompleted()).isEqualTo(4);
         assertThat(result.canvasAssignmentsDue()).isEqualTo(2);
         assertThat(result.canvasAssignmentsCompleted()).isEqualTo(1);
         assertThat(result.calendarEvents()).isEqualTo(3);
@@ -210,6 +210,23 @@ class InsightsServiceTest {
         event.setStartAt(start);
         event.setEndAt(end);
         return event;
+    }
+
+    @Test
+    void futureManualAndCanvasEventsIncreaseTotalButNotProgress() {
+        LocalDate tomorrow = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(1);
+        Instant from = tomorrow.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+        Instant to = from.plusSeconds(7 * 86400);
+        stubEmptyAggregates(from, to);
+        var manual = event(null, from.plusSeconds(60), from.plusSeconds(3600));
+        var canvas = event("EVENT", from, from.plusSeconds(86400));
+        canvas.setAllDay(true);
+        canvas.setCanvasStartDate(tomorrow);
+        canvas.setCanvasEndDate(tomorrow.plusDays(1));
+        when(calendarEventRepository.findByUserIdOrderByStartAtAsc(USER_ID)).thenReturn(List.of(manual, canvas));
+        var result = insightsService.summary(USER_ID, from, to, java.time.ZoneOffset.UTC);
+        assertThat(result.weeklyTasksDue()).isEqualTo(2);
+        assertThat(result.weeklyTasksCompleted()).isZero();
     }
 
     @Test

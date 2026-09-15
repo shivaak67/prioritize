@@ -29,11 +29,11 @@
       <ul class="insights__stats">
         <li>
           <strong>{{ data.weeklyTasksCompleted }} / {{ data.weeklyTasksDue }}</strong>
-          <span>tasks and assignments completed</span>
+          <span>tasks, assignments, and events completed or elapsed</span>
         </li>
         <li>
           <strong>{{ weeklyCompletionRate() }}%</strong>
-          <span>completion rate</span>
+          <span>overall progress</span>
         </li>
         <li>
           <strong>{{ formatFocusedMinutes(data.totalMinutesLogged) }}</strong>
@@ -52,18 +52,7 @@
           <span>most worked-on category</span>
         </li>
       </ul>
-      <p class="insights__explanation">Completion includes tasks and Canvas assignments due this week. Canvas completion is tracked in Prioritize.</p>
-    </article>
-
-    <article class="surface insights__week">
-      <h2>Canvas and calendar</h2>
-      <ul class="insights__stats">
-        <li><strong>{{ data.canvasAssignmentsCompleted }} / {{ data.canvasAssignmentsDue }}</strong><span>Canvas assignments completed</span></li>
-        <li><strong>{{ data.calendarEvents }}</strong><span>scheduled events and time blocks</span></li>
-        <li><strong>{{ data.canvasEvents }}</strong><span>of those imported from Canvas</span></li>
-        <li><strong>{{ formatFocusedMinutes(data.scheduledMinutes) }}</strong><span>scheduled event time</span></li>
-      </ul>
-      <p class="insights__explanation">Scheduled time adds up timed events within this week, including overlapping events. All-day events count as events but add no hours. Events are not marked completed automatically and scheduled time is separate from logged focus time.</p>
+      <p class="insights__explanation">One total for tasks and Canvas assignments due this week, plus calendar events, Canvas events, and time blocks overlapping this week. Tasks and assignments count when marked complete; events count after their end time (elapsed does not confirm attendance). Focus time includes only logged work.</p>
     </article>
 
     <div class="insights__columns">
