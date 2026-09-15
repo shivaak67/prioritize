@@ -1,18 +1,26 @@
 # Prioritize
 
-AI-powered productivity and academic planning platform with Canvas Calendar Feed integration. Organize work as Goals → Projects → Tasks, block time on a schedule, manage calendar events and routines, and track progress with reminders, insights, and time entries.
+AI-powered productivity and academic planning platform with Canvas Calendar Feed integration and SMS deadline reminders. Organize work as Goals → Projects → Tasks, block time on a schedule, manage calendar events and routines, and track progress with reminders, insights, and time entries.
 
 ## Screenshots
 
 **Live app:** [theprioritize.com](https://theprioritize.com/) · **Default branch:** [main](https://github.com/shivaak67/prioritize/tree/main)
 
-Captured from the deployed application on September 15, 2026. These are live app screens; account contact information and private Canvas feed URLs are excluded.
+Captured from the deployed application on September 15, 2026. Each screenshot shows the website with its left navigation visible, without browser tabs or address bars. Private Canvas feed URLs are excluded.
 
 ### Ask AI — plan with your actual tasks and Canvas deadlines
 
 Ask natural-language questions about your workload, deadlines, and schedule. The OpenAI-powered assistant uses your task and calendar context, including imported Canvas assignments, and can create or update tasks and events. Below, it retrieves today's Canvas assignments and their exact due times.
 
 ![Live AI assistant answering a question about Canvas deadlines](docs/screenshots/ai-live.png)
+
+### SMS reminders — get deadline alerts on your phone
+
+Schedule text messages for personal tasks, Canvas assignments, and calendar events. Enable SMS and verify your phone in Settings, then choose reminders **1 week, 1 day, 2 hours, or 30 minutes before** the deadline. SMS is sent through Twilio; email is also available when enabled.
+
+**Reminder set** badges show existing notification times and channels before you select an item. Schedule several items together with **Select all**, or use **Select without reminders** to avoid duplicating your setup. Cancel pending reminders individually and clear recent activity separately. “Sent to provider” records acceptance for sending, not confirmed phone delivery.
+
+![SMS reminder scheduling with existing reminder badges, timing options, and full website navigation](docs/screenshots/reminders-live.png)
 
 ### Dashboard — see what needs attention
 
@@ -31,12 +39,6 @@ Search and filter your work, edit personal tasks, and mark Canvas assignments co
 See personal tasks, editable time blocks, Canvas assignments, and course events in one calendar.
 
 ![Live calendar showing Canvas deadlines and personal events](docs/screenshots/calendar-live.png)
-
-### Reminders — see what is already scheduled
-
-Existing reminders are marked beside each assignment or event, including timing and channel. Select several items, select all, or select only items without reminders. Recent activity can be cleared separately from pending reminders.
-
-![Live reminder selection with Reminder set badges and notification times](docs/screenshots/reminders-live.png)
 
 ### Insights — one weekly total
 
@@ -70,7 +72,7 @@ Prioritize helps you plan and execute work with a clear hierarchy: categories an
 - Categories, goals, projects, and tasks (manual priority)
 - Schedule blocks (time-blocking) and personal calendar events
 - Recurring routines and occurrences
-- Reminders and in-app notifications
+- SMS deadline reminders through Twilio, verified phone setup, email reminders, bulk scheduling, existing-reminder badges, and in-app notifications
 - Time entries and insights summary: weekly progress combines tasks, Canvas assignments, calendar events, and time blocks. Tasks and assignments count when marked complete; events count after their end time has elapsed. Scheduled time does not count as logged focus. Week boundaries follow the browser's time zone.
 - OpenAI-powered assistant for task and calendar questions, creation, and updates
 - Dashboard overview
@@ -97,6 +99,8 @@ See [docs/architecture.md](docs/architecture.md) for schema, auth flow, and phas
 | Backend | Java, Spring Boot, Spring Security, Spring Data JPA |
 | Database | PostgreSQL |
 | Auth | JWT + Google OAuth 2.0 / OIDC |
+| AI | OpenAI API with task and calendar tools |
+| Notifications | Twilio SMS, email reminders, and in-app notifications |
 | Analytics | Power BI |
 | DevOps | Docker, Docker Compose, GitHub Actions |
 | Cloud | AWS EC2 + EBS; PostgreSQL runs in Docker on EC2 |
