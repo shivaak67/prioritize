@@ -27,7 +27,7 @@ import com.prioritize.repository.TaskRepository;
 import com.prioritize.repository.UserRepository;
 
 @Service
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, noRollbackFor = {ResourceNotFoundException.class, IllegalArgumentException.class})
 public class ReminderContentResolver {
 
     private static final DateTimeFormatter EVENT_FORMAT =

@@ -70,6 +70,24 @@ class AssistantDateTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void calendarContextKeepsLocalDatesAcrossMidnightAndChecksAllLists() {
+        properties.setEnabled(true); properties.setApiKey("test");
+        when(dashboard.summary(userId, ZoneId.of("America/Chicago"))).thenReturn(mock(DashboardSummaryResponse.class));
+        var event = new CalendarEventResponse(UUID.randomUUID(), null, "Late study", null,
+                Instant.parse("2026-09-07T04:30:00Z"), Instant.parse("2026-09-07T05:30:00Z"),
+                false, null, null, null, null, null, null, false);
+        when(events.list(userId, null, null)).thenReturn(List.of(event));
+        when(llm.complete(any(), any())).thenReturn(new LlmCompletion("Ready", List.of()));
+        service.chat(userId, new AssistantChatRequest("Any duplicates tomorrow?", null, "America/Chicago"));
+        ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
+        verify(llm).complete(messages.capture(), any());
+        assertThat(messages.getValue().getFirst().get("content").toString())
+                .contains("Tomorrow key: 2026-09-06", "from 2026-09-06 11:30 PM -05:00 to 2026-09-07 12:30 AM -05:00",
+                        "check all three lists", "Reminder notification times are not assignment deadlines");
+    }
+
+    @Test
     void calendarToolInterpretsLocalTimeInUsersZone() {
         var executor = new AssistantToolExecutor(new ObjectMapper(), tasks, events, clock);
         executor.execute(userId, "create_calendar_event",
