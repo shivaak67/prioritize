@@ -13,6 +13,7 @@ import org.springframework.web.context.request.WebRequest;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, WebRequest request) {
@@ -44,7 +45,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, WebRequest request) {
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", request);
+        String reference = java.util.UUID.randomUUID().toString();
+        // Do not log request bodies, conversation text, credentials, or exception messages.
+        log.error("Unhandled request failure reference={} type={} stack={}", reference,
+                ex.getClass().getName(), java.util.Arrays.toString(ex.getStackTrace()));
+        return build(HttpStatus.INTERNAL_SERVER_ERROR,
+                "We couldn't finish that request. Please try again. Error reference: " + reference, request);
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message, WebRequest request) {
