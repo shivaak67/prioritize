@@ -14,6 +14,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.prioritize.model.AppNotification;
+import com.prioritize.exception.ResourceNotFoundException;
 import com.prioritize.model.NotificationChannel;
 import com.prioritize.model.NotificationSettings;
 import com.prioritize.model.Reminder;
@@ -93,6 +94,9 @@ public class ReminderDispatchService {
             reminder.setStatus(ReminderStatus.SENT);
             reminder.setSentAt(now);
             reminder.setFailureReason(null);
+        } catch (ResourceNotFoundException ex) {
+            reminder.setStatus(ReminderStatus.CANCELLED);
+            reminder.setFailureReason("The related item no longer exists.");
         } catch (DeliveryException ex) {
             reminder.setStatus(ReminderStatus.FAILED);
             reminder.setFailureReason(ex.getMessage());

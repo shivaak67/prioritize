@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.prioritize.config.AiProperties;
 import com.prioritize.dto.AssistantChatRequest;
@@ -51,6 +50,15 @@ public class AssistantService {
             and overdue assignments before recommending later work. Mention today's quiz without requiring a follow-up.
             Completed Canvas assignments must not be recommended as unfinished work.
             All-day Canvas dates are date-only deadlines, not appointments or midnight deadlines.
+            Calendar questions include ALL three lists: personal tasks, Canvas assignments, and calendar events.
+            An empty calendar-events list does not mean there are no assignments or tasks on that date.
+            Before saying a day is empty, check all three lists for that local date.
+            Reminder notification times are not assignment deadlines. No reminder data is supplied here;
+            do not invent reminders or claim you checked them. Similar titles alone do not prove duplicates.
+            Compare IDs, titles, dates, and times, and describe possible duplicates without deleting anything
+            unless the user explicitly asks. Canvas assignments are read-only through these tools;
+            do not use task or calendar editing tools to change or delete a Canvas assignment.
+            If a tool reports failure, explain that failure; never claim the change succeeded.
             Be concise, practical, and friendly. Prefer short paragraphs or bullet lists when listing items.
             The current date and timezone in USER DATA are authoritative for this request.
             Use them for today, tomorrow, and relative dates, even if earlier chat messages give a different date.
@@ -85,7 +93,6 @@ public class AssistantService {
         this.clock = clock;
     }
 
-    @Transactional
     public AssistantChatResponse chat(UUID userId, AssistantChatRequest request) {
         ZoneId zone = resolveZone(request.timeZone());
         if (isDateQuestion(request.message())) {
@@ -169,6 +176,7 @@ public class AssistantService {
         StringBuilder sb = new StringBuilder();
         sb.append("Today: ").append(DATE_LABEL.withZone(zone).format(now)).append('\n');
         sb.append("Today key: ").append(TODAY_KEY.withZone(zone).format(now)).append('\n');
+        sb.append("Tomorrow key: ").append(now.atZone(zone).toLocalDate().plusDays(1)).append('\n');
         sb.append("User timezone: ").append(zone.getId()).append('\n');
         sb.append('\n');
 
@@ -244,6 +252,12 @@ public class AssistantService {
             sb.append("- (none)\n");
         } else {
             for (CalendarEventResponse event : events) {
+                if (event.allDay() && event.canvasStartDate() != null) {
+                    sb.append("- [id=").append(event.id()).append("] ").append(event.title())
+                            .append(" on ").append(event.canvasStartDate())
+                            .append(" (all day; exclusive end date ").append(event.canvasEndDate()).append(")\n");
+                    continue;
+                }
                 sb.append("- [id=").append(event.id()).append("] ")
                         .append(event.title())
                         .append(" from ")
@@ -261,7 +275,7 @@ public class AssistantService {
     }
 
     private String formatInstant(Instant instant, ZoneId zone) {
-        return TIME_RANGE_FORMAT.withZone(zone).format(instant);
+        return DateTimeFormatter.ofPattern("yyyy-MM-dd h:mm a XXX", Locale.US).withZone(zone).format(instant);
     }
 
     static ZoneId resolveZone(String timeZone) {

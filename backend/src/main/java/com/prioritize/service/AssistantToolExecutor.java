@@ -309,8 +309,10 @@ public class AssistantToolExecutor {
         ObjectNode node = objectMapper.createObjectNode();
         node.put("id", event.id().toString());
         node.put("title", event.title());
-        node.put("startAt", TIME_12H.withZone(zone).format(event.startAt()));
-        node.put("endAt", TIME_12H.withZone(zone).format(event.endAt()));
+        node.put("startAt", event.startAt().atZone(zone).toOffsetDateTime().toString());
+        node.put("endAt", event.endAt().atZone(zone).toOffsetDateTime().toString());
+        node.put("timeZone", zone.getId());
+        node.put("allDay", event.allDay());
         return node;
     }
 

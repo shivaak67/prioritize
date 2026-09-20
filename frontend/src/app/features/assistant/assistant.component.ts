@@ -32,9 +32,9 @@ const STARTER_PROMPTS = [
 const LOADING_STAGES = [
   { afterMs: 0, message: 'Thinking…' },
   { afterMs: 2500, message: 'Loading your tasks and schedule…' },
-  { afterMs: 8000, message: 'Warming up the model — first response can take up to a minute with local AI.' },
-  { afterMs: 30000, message: 'Still working on it. Large local models can take a while on the first reply.' },
-  { afterMs: 60000, message: 'Almost there — thanks for waiting.' },
+  { afterMs: 8000, message: 'Still working on your request…' },
+  { afterMs: 30000, message: 'This is taking longer than usual. Please wait for the result before sending again.' },
+  { afterMs: 60000, message: 'Still waiting for a response…' },
 ];
 
 @Component({
@@ -183,15 +183,15 @@ export class AssistantComponent implements OnInit, OnDestroy {
         if (statusCode === 401) {
           this.error.set('Your session expired. Redirecting to login…');
         } else if (statusCode === 0) {
-          this.error.set('Cannot reach the API. Is the backend running on port 8080?');
+          this.error.set('Connection interrupted. Check your connection and try again. If you requested a change, check your tasks or calendar before repeating it.');
         } else if (statusCode === 502) {
           this.error.set(
-            'The AI model took too long to respond. If you are using local Ollama, wait for warmup to finish and try again.',
+            serverMessage ?? 'The AI service could not finish this request. Please try again. If you requested a change, check your tasks or calendar before repeating it.',
           );
         } else if (serverMessage) {
           this.error.set(serverMessage);
         } else {
-          this.error.set('Could not get a response from the assistant. Try restarting the backend.');
+          this.error.set('Could not get a response. Please try again. If you requested a change, check your tasks or calendar before repeating it.');
         }
         this.stopLoading();
       },
