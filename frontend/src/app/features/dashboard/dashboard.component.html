@@ -1,133 +1,221 @@
-<section class="page prio-page dash">
+<section class="prio-page dash">
   <header class="dash__hero">
     <div>
-      <h1>{{ greeting() }}, {{ userName() }} 👋</h1>
+      <h1>{{ greeting() }}, {{ userName() }} <span aria-hidden="true">👋</span></h1>
       <p>{{ dateLabel() }}</p>
     </div>
-    <div class="dash__hero-actions">
-      <button mat-stroked-button type="button" (click)="guide.open()">Getting started</button>
-      <a mat-stroked-button routerLink="/today">Today timeline</a>
-      <button mat-stroked-button type="button" (click)="reload()" [disabled]="loading()">
-        <mat-icon>refresh</mat-icon>
-        Reload
-      </button>
-    </div>
+    <form class="dash__hero-ai" (submit)="$event.preventDefault(); askAi(heroQuestion.value)">
+      <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+      <label class="sr-only" for="dashboard-ai">Ask Prioritize AI</label>
+      <input #heroQuestion id="dashboard-ai" placeholder="Ask Prioritize AI…" autocomplete="off" />
+      <button type="submit" aria-label="Ask Prioritize AI"><mat-icon>arrow_forward</mat-icon></button>
+    </form>
   </header>
 
   @if (error(); as message) {
+    <div class="dash__banner dash__banner--error" role="alert">
+      <span>{{ message }}</span>
+      <button mat-button type="button" (click)="reload()">Try again</button>
+    </div>
+  }
+  @if (actionError(); as message) {
     <p class="dash__banner dash__banner--error" role="alert">{{ message }}</p>
   }
 
-
-
   @if (canvasConnected() === false) {
-    <section class="dash__panel dash__canvas" aria-labelledby="canvas-welcome">
-      <p class="prio-kicker">Use Canvas for school?</p>
-      <h2 id="canvas-welcome">Bring your assignments into Prioritize</h2>
-      <p>Connect once to see assignment deadlines and course events. No developer key needed.</p>
-      <ol>
-        <li>Open your school's Canvas and choose <strong>Calendar</strong>.</li>
-        <li>Select <strong>Calendar Feed</strong> and copy your private link.</li>
-        <li>Paste the link in Prioritize to import your assignments.</li>
-      </ol>
-      <a mat-flat-button routerLink="/settings">Connect Canvas · Start setup</a>
-      <p class="dash__muted">Your link stays private. Updates flow from Canvas about every 30 minutes.</p>
-    </section>
+    <aside class="dash__canvas" aria-labelledby="canvas-welcome">
+      <mat-icon aria-hidden="true">school</mat-icon>
+      <div>
+        <strong id="canvas-welcome">Bring Canvas into your week</strong>
+        <span>Import assignments and course events with your private calendar feed.</span>
+      </div>
+      <a mat-stroked-button routerLink="/settings">Connect Canvas</a>
+    </aside>
   }
 
-  @if (!loading() && !error()) { <app-onboarding [tasks]="tasks()" (changed)="reload()" /> }
+  @if (!loading() && !error()) {
+    <app-onboarding [tasks]="tasks()" (changed)="reload()" />
+  }
 
-  <div class="dash__stats">
+  @if (!error()) {
+  <section class="dash__metrics" aria-label="Work overview">
     @for (stat of stats(); track stat.label) {
-      <a class="dash__stat dash__stat-link" routerLink="/tasks" [queryParams]="{ view: stat.view }" [attr.aria-label]="stat.label + ': ' + stat.value + '. View tasks'">
-        <p class="dash__stat-value">{{ loading() ? '—' : stat.value }}</p>
-        <p class="dash__stat-label">{{ stat.label }}</p>
+      <a class="metric" [attr.data-tone]="stat.tone" routerLink="/tasks" [queryParams]="{ view: stat.view }"
+         [attr.aria-label]="loading() ? stat.label + ': loading. View tasks' : stat.label + ': ' + stat.value + '. View tasks'">
+        <span class="metric__icon"><mat-icon aria-hidden="true">{{ stat.icon }}</mat-icon></span>
+        <span>
+          <strong>{{ loading() ? '—' : stat.value }}</strong>
+          <small>{{ stat.label }}</small>
+        </span>
       </a>
     }
-  </div>
-
-  <section class="dash__panel dash__ai">
-    <div class="dash__ai-head">
-      <h2>Ask Prioritize AI</h2>
-      <a mat-stroked-button routerLink="/assistant" class="dash__ai-cta">
-        <mat-icon>auto_awesome</mat-icon>
-        Open AI Assistant
-      </a>
-    </div>
-    <p class="dash__muted">Plan your day, or ask about your tasks and deadlines.</p>
-    <div class="dash__ai-prompts">
-      @for (prompt of aiPrompts; track prompt) {
-        <a class="dash__ai-chip" routerLink="/assistant" [queryParams]="{ q: prompt }">
-          {{ prompt }}
-        </a>
-      }
-    </div>
-  </section>
-
-  <div class="dash__grid">
-    <section class="dash__panel">
-      <h2>Today's plan</h2>
-      @if (loading()) {
-        <p class="dash__muted">Loading…</p>
-      } @else if (todayPlan().length === 0) {
-        <p class="dash__muted">Nothing scheduled for today yet.</p>
-        <a routerLink="/calendar">Add calendar events</a>
-      } @else {
-        <ul class="dash__plan">
-          @for (item of todayPlan(); track item.id) {
-            <li [class.dash__plan-item--event]="item.kind === 'event'">
-              <span class="dash__plan-time">
-                <span>{{ item.time }}</span>
-                @if (item.endTime) {
-                  <span class="dash__plan-time-end">– {{ item.endTime }}</span>
-                }
-              </span>
-              <div>
-                <strong>{{ item.title }}</strong>
-                @if (item.subtitle) {
-                  <p>{{ item.subtitle }}</p>
-                }
-              </div>
-            </li>
-          }
-        </ul>
-      }
-    </section>
-
-    <section class="dash__panel">
-      <h2>Weekly progress</h2>
-      @if (loading()) {
-        <p class="dash__muted">Loading…</p>
-      } @else {
-        <p class="dash__progress-label">
-          {{ weeklyProgress().done }} / {{ weeklyProgress().total }} tasks and assignments
-        </p>
-        <div class="dash__progress-bar" aria-hidden="true">
+    <article class="metric metric--progress" aria-label="Weekly progress">
+      <div>
+        <strong>Weekly progress</strong>
+        <small>{{ weeklyProgress().done }} / {{ weeklyProgress().total }} tasks and assignments</small>
+      </div>
+      <div class="metric__progress-row">
+        <div class="metric__segments" aria-hidden="true">
           @for (filled of progressSegments(); track $index) {
-            <span [class.dash__progress-seg--filled]="filled"></span>
+            <span [class.is-filled]="filled"></span>
           }
         </div>
-        <p class="dash__progress-percent">{{ weeklyProgress().percent }}%</p>
-      }
-    </section>
-  </div>
-
-  <section class="dash__panel dash__panel--deadlines">
-    <h2>Deadlines &amp; upcoming events</h2>
-    <p class="dash__muted">Overdue tasks and the next 7 days.</p>
-    @if (loading()) {
-      <p class="dash__muted">Loading…</p>
-    } @else if (upcomingDeadlines().length === 0) {
-      <p class="dash__muted">You're all caught up. No deadlines or events in the next 7 days.</p>
-    } @else {
-      <ul class="dash__deadlines">
-        @for (item of upcomingDeadlines(); track item.id) {
-          <li [class.dash__deadline--overdue]="item.overdue">
-            <a [routerLink]="item.route">{{ item.title }}</a>
-            <strong>{{ item.when }}</strong>
-          </li>
-        }
-      </ul>
-    }
+        <b>{{ weeklyProgress().percent }}%</b>
+      </div>
+    </article>
   </section>
+
+  <div class="dash__layout">
+    <div class="dash__primary">
+      <section class="panel next-up" aria-labelledby="next-up-title">
+        <div class="panel__head">
+          <div>
+            <h2 id="next-up-title">Next up</h2>
+            <p>Your highest priority for now.</p>
+          </div>
+          @if (nextItems().length > 1) {
+            <div class="next-up__pager">
+              <button type="button" (click)="moveNext(-1)" aria-label="Previous priority"><mat-icon>chevron_left</mat-icon></button>
+              <span>{{ nextIndex() + 1 }} of {{ nextItems().length }}</span>
+              <button type="button" (click)="moveNext(1)" aria-label="Next priority"><mat-icon>chevron_right</mat-icon></button>
+            </div>
+          }
+        </div>
+
+        @let item = currentNext();
+        @if (loading()) {
+          <div class="dash__skeleton dash__skeleton--hero" aria-label="Loading next priority"></div>
+        } @else if (item) {
+          <div class="next-up__content">
+            <div class="next-up__copy">
+              <span class="status-pill" [class.status-pill--overdue]="item.badge === 'Overdue'">{{ item.badge }}</span>
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.subtitle }}</p>
+            </div>
+            <div class="next-up__time">
+              <span>{{ item.badge }}</span>
+              <strong>{{ item.time }}</strong>
+            </div>
+          </div>
+          <div class="next-up__actions">
+            @if (item.task) {
+              <a mat-flat-button [routerLink]="['/focus']" [queryParams]="{ task: item.task.id }">
+                <mat-icon>play_arrow</mat-icon> Start focus session
+              </a>
+            } @else if (item.canvas?.canvasUrl) {
+              <a mat-flat-button [href]="item.canvas?.canvasUrl" target="_blank" rel="noopener">
+                <mat-icon>open_in_new</mat-icon> Open assignment
+              </a>
+            } @else {
+              <a mat-flat-button routerLink="/calendar"><mat-icon>event</mat-icon> View in calendar</a>
+            }
+            <button mat-stroked-button type="button" (click)="completeNext()" [disabled]="!!completingId()">
+              <mat-icon>check</mat-icon>
+              {{ completingId() === item.id ? 'Saving…' : 'Mark complete' }}
+            </button>
+          </div>
+          @if (item.canvas) {
+            <p class="next-up__note"><mat-icon>info_outline</mat-icon> Completion is local to Prioritize and does not submit work in Canvas.</p>
+          }
+        } @else {
+          <div class="empty-state">
+            <mat-icon>task_alt</mat-icon>
+            <div><strong>Nothing urgent right now</strong><p>You’re caught up. Add a task or review your calendar.</p></div>
+            <a mat-stroked-button routerLink="/tasks">Open tasks</a>
+          </div>
+        }
+
+        <div class="ai-box">
+          <div class="ai-box__label"><mat-icon>auto_awesome</mat-icon><strong>Ask Prioritize AI</strong></div>
+          <form (submit)="$event.preventDefault(); askAi(aiQuestion.value)">
+            <label class="sr-only" for="next-ai">Ask what to work on next</label>
+            <input #aiQuestion id="next-ai" placeholder="What should I work on next?" autocomplete="off" />
+            <button type="submit" aria-label="Send question"><mat-icon>arrow_forward</mat-icon></button>
+          </form>
+          <div class="ai-box__prompts">
+            @for (prompt of aiPrompts; track prompt) {
+              <a routerLink="/assistant" [queryParams]="{ q: prompt }">{{ prompt }}</a>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section class="panel today-card" aria-labelledby="today-title">
+        <div class="panel__head">
+          <div>
+            <h2 id="today-title">Today</h2>
+            <p>{{ todayPlan().length }} {{ todayPlan().length === 1 ? 'item' : 'items' }} <span>•</span> {{ dateLabel() }}</p>
+          </div>
+          <a mat-stroked-button routerLink="/today">View timeline</a>
+        </div>
+        @if (loading()) {
+          <div class="dash__skeleton"></div>
+        } @else if (todayPlan().length === 0) {
+          <div class="empty-state">
+            <mat-icon>event_available</mat-icon>
+            <div><strong>Your day is clear</strong><p>Take time to review, plan ahead, or add a calendar event.</p></div>
+            <a mat-stroked-button routerLink="/calendar">Open calendar</a>
+          </div>
+        } @else {
+          <ol class="agenda">
+            @for (item of todayPlan().slice(0, 5); track item.id) {
+              <li>
+                <time>{{ item.time }}@if (item.endTime) { – {{ item.endTime }} }</time>
+                <span class="agenda__dot" [attr.data-kind]="item.kind"></span>
+                <a [routerLink]="item.route">
+                  <strong>{{ item.title }}</strong>
+                  <span>{{ item.subtitle }}</span>
+                </a>
+                <span class="status-pill" [class.status-pill--overdue]="item.badge === 'Overdue'">{{ item.badge }}</span>
+              </li>
+            }
+          </ol>
+        }
+      </section>
+    </div>
+
+    <div class="dash__secondary">
+      <section class="panel week-card" aria-labelledby="week-title">
+        <div class="panel__head">
+          <div><h2 id="week-title">This week</h2><p>{{ stats()[2].value }} tasks and assignments</p></div>
+          <a mat-stroked-button routerLink="/calendar"><mat-icon>calendar_month</mat-icon> View calendar</a>
+        </div>
+        <div class="week-strip" role="list" aria-label="Open work due by day">
+          @for (day of weekDays(); track day.key) {
+            <div role="listitem" [class.is-today]="day.today" [attr.aria-label]="day.weekday + ' ' + day.date + ': ' + day.count + ' items'">
+              <span>{{ day.weekday }}</span><small>{{ day.date }}</small><strong>{{ day.count }}</strong>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="panel deadlines-card" aria-labelledby="deadlines-title">
+        <div class="panel__head">
+          <div><h2 id="deadlines-title">Upcoming deadlines</h2><p>Overdue and the next 7 days</p></div>
+          <a mat-stroked-button routerLink="/tasks" [queryParams]="{ view: 'all' }">View all <mat-icon>chevron_right</mat-icon></a>
+        </div>
+        @if (loading()) {
+          <div class="dash__skeleton dash__skeleton--list"></div>
+        } @else if (upcomingDeadlines().length === 0) {
+          <div class="empty-state empty-state--compact">
+            <mat-icon>done_all</mat-icon>
+            <div><strong>All caught up</strong><p>No deadlines or events in the next 7 days.</p></div>
+          </div>
+        } @else {
+          <ol class="deadlines">
+            @for (item of upcomingDeadlines().slice(0, 6); track item.id) {
+              <li [class.is-overdue]="item.overdue">
+                <div class="deadlines__when"><strong>{{ item.dateLabel }}</strong><span>{{ item.timeLabel }}</span></div>
+                <span class="deadlines__dot"></span>
+                <a [routerLink]="item.route"><strong>{{ item.title }}</strong><span>{{ item.subtitle }}</span></a>
+                <span class="status-pill">{{ item.badge }}</span>
+              </li>
+            }
+          </ol>
+          <a class="deadlines__footer" routerLink="/tasks" [queryParams]="{ view: 'all' }">View all upcoming deadlines <mat-icon>chevron_right</mat-icon></a>
+        }
+      </section>
+    </div>
+  </div>
+  }
 </section>

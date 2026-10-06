@@ -1,42 +1,20 @@
-import { canvasDeadlineTask } from '../../core/api/canvas-deadline';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { OnboardingComponent } from '../onboarding/onboarding.component';
-import { OnboardingService } from '../onboarding/onboarding.service';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { forkJoin } from 'rxjs';
+import { canvasDeadlineTask } from '../../core/api/canvas-deadline';
 import { ApiService } from '../../core/api/api.service';
+import { CalendarEventDto, TaskDto } from '../../core/api/api.models';
 import { AuthService } from '../../core/auth/auth.service';
-import {
-  CalendarEventDto,
-  TaskDto,
-} from '../../core/api/api.models';
+import { OnboardingComponent } from '../onboarding/onboarding.component';
+import { OnboardingService } from '../onboarding/onboarding.service';
 
-interface DashStat {
-  label: string;
-  value: number;
-  view: string;
-}
-
-interface PlanItem {
-  id: string;
-  kind: 'event' | 'task';
-  time: string;
-  endTime?: string;
-  title: string;
-  subtitle?: string;
-  sortKey: number;
-}
-
-interface DeadlineItem {
-  id: string;
-  title: string;
-  when: string;
-  sortKey: number;
-  route: string;
-  overdue: boolean;
-}
+interface DashStat { label: string; value: number; view: string; icon: string; tone: 'teal' | 'danger' | 'blue'; }
+interface PlanItem { id: string; kind: 'event' | 'task' | 'canvas'; time: string; endTime?: string; title: string; subtitle?: string; sortKey: number; route: string; badge: string; }
+interface DeadlineItem { id: string; title: string; subtitle?: string; dateLabel: string; timeLabel: string; badge: string; sortKey: number; route: string; overdue: boolean; }
+interface NextItem { id: string; title: string; subtitle: string; badge: string; time: string; sortKey: number; urgency: number; priority: number; task?: TaskDto; canvas?: CalendarEventDto; }
+interface WeekDay { key: string; weekday: string; date: string; count: number; today: boolean; }
 
 @Component({
   selector: 'app-dashboard',
@@ -47,329 +25,230 @@ interface DeadlineItem {
 })
 export class DashboardComponent implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly router = inject(Router);
   readonly guide = inject(OnboardingService);
   private readonly auth = inject(AuthService);
 
   readonly loading = signal(true);
+  readonly completingId = signal<string | null>(null);
+  readonly nextIndex = signal(0);
   readonly canvasConnected = signal<boolean | null>(null);
   readonly error = signal<string | null>(null);
+  readonly actionError = signal<string | null>(null);
   readonly tasks = signal<TaskDto[]>([]);
   readonly events = signal<CalendarEventDto[]>([]);
 
-  readonly planningTasks = computed(() => [...this.tasks(),
-    ...this.events().filter(e => e.canvasKind === 'DEADLINE').map(canvasDeadlineTask)]);
+  readonly planningTasks = computed(() => [
+    ...this.tasks(),
+    ...this.events().filter((event) => event.canvasKind === 'DEADLINE').map(canvasDeadlineTask),
+  ]);
 
-  readonly aiPrompts = [
-    'What should I work on today?',
-    'What tasks are overdue?',
-    "What's on my calendar this week?",
-  ];
+  readonly aiPrompts = ["What's due today?", 'Help me plan my study time', 'Show my hardest tasks'];
 
   readonly greeting = computed(() => {
     const hour = new Date().getHours();
-    if (hour < 12) {
-      return 'Good morning';
-    }
-    if (hour < 17) {
-      return 'Good afternoon';
-    }
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
     return 'Good evening';
   });
-
   readonly userName = computed(() => this.auth.currentUser()?.firstName ?? 'there');
-
-  readonly dateLabel = computed(() =>
-    new Date().toLocaleDateString(undefined, {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-    }),
-  );
+  readonly dateLabel = computed(() => new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }));
 
   readonly stats = computed((): DashStat[] => {
     const today = toDateKey(new Date());
-    const weekEnd = addDays(startOfWeek(new Date()), 7);
-    const weekStartKey = toDateKey(startOfWeek(new Date()));
-    const weekEndKey = toDateKey(weekEnd);
-
-    let dueToday = 0;
-    let overdue = 0;
-    let dueThisWeek = 0;
-
+    const weekStart = toDateKey(startOfWeek(new Date()));
+    const weekEnd = toDateKey(addDays(startOfWeek(new Date()), 7));
+    let dueToday = 0; let overdue = 0; let dueThisWeek = 0;
     for (const task of this.planningTasks()) {
-      const isOpen = task.status === 'TODO' || task.status === 'IN_PROGRESS';
-      if (!isOpen || !task.dueDate) {
-        continue;
-      }
-      if (task.dueDate === today) {
-        dueToday += 1;
-      }
-      if (task.dueDate < today || (task.dueDate === today && task.dueTime && (taskDateTime(task.dueDate, task.dueTime)?.getTime() ?? Infinity) < Date.now())) {
-        overdue += 1;
-      }
-      if (task.dueDate >= weekStartKey && task.dueDate < weekEndKey) {
-        dueThisWeek += 1;
-      }
+      if (!isOpen(task) || !task.dueDate) continue;
+      if (task.dueDate === today) dueToday++;
+      if (isOverdue(task, new Date())) overdue++;
+      if (task.dueDate >= weekStart && task.dueDate < weekEnd) dueThisWeek++;
     }
-
     return [
-      { label: 'Due Today', value: dueToday, view: 'today' },
-      { label: 'Overdue', value: overdue, view: 'overdue' },
-      { label: 'This Week', value: dueThisWeek, view: 'week' },
+      { label: 'Due today', value: dueToday, view: 'today', icon: 'assignment', tone: 'teal' },
+      { label: 'Overdue', value: overdue, view: 'overdue', icon: 'error_outline', tone: 'danger' },
+      { label: 'This week', value: dueThisWeek, view: 'week', icon: 'calendar_month', tone: 'blue' },
     ];
   });
 
-  readonly todayPlan = computed((): PlanItem[] => {
-    const todayKey = toDateKey(new Date());
-    const items: PlanItem[] = [];
-
-    for (const event of this.events()) {
-      if (event.canvasKind === 'DEADLINE' ? event.canvasCompleted || canvasDeadlineTask(event).dueDate !== todayKey
-          : !overlapsDay(event.startAt, event.endAt, todayKey)) {
-        continue;
-      }
-      const start = new Date(event.startAt);
-      const end = new Date(event.endAt);
-      items.push({
-        id: `event-${event.id}`,
-        kind: 'event',
-        time: (event.canvasKind === 'DEADLINE' ? 'Due ' : '') + (event.allDay ? (event.canvasKind === 'DEADLINE' ? 'today · Time not provided by Canvas' : 'All day') : formatTime(start)),
-        endTime: event.allDay || event.canvasKind === 'DEADLINE' ? undefined : formatTime(end),
-        title: event.title,
-        subtitle: event.canvasKind === 'DEADLINE' ? 'Canvas assignment' : event.description ?? undefined,
-        sortKey: event.allDay ? 0 : start.getTime(),
-      });
-    }
-
-    for (const task of this.tasks()) {
-      if (!task.dueDate || dueDateKey(task.dueDate) !== todayKey) {
-        continue;
-      }
-      if (task.status === 'COMPLETED' || task.status === 'CANCELLED') {
-        continue;
-      }
-      const start = taskDateTime(task.dueDate, task.dueTime ?? '23:59');
-      if (!start) {
-        continue;
-      }
-      items.push({
-        id: `task-${task.id}`,
-        kind: 'task',
-        time: task.dueTime ? formatTime(start) : 'Any time',
-        title: task.title,
-        sortKey: start.getTime(),
-      });
-    }
-
-    return items.sort((a, b) => a.sortKey - b.sortKey);
+  readonly weeklyProgress = computed(() => {
+    const weekStart = toDateKey(startOfWeek(new Date()));
+    const weekEnd = toDateKey(addDays(startOfWeek(new Date()), 7));
+    const week = this.planningTasks().filter((task) => task.status !== 'CANCELLED' && !!task.dueDate && task.dueDate >= weekStart && task.dueDate < weekEnd);
+    const done = week.filter((task) => task.status === 'COMPLETED').length;
+    return { done, total: week.length, percent: week.length ? Math.round((done / week.length) * 100) : 0 };
   });
 
-  readonly weeklyProgress = computed(() => {
-    const weekStart = startOfWeek(new Date());
-    const weekEnd = addDays(weekStart, 7);
-    const weekStartKey = toDateKey(weekStart);
-    const weekEndKey = toDateKey(weekEnd);
+  readonly weekDays = computed((): WeekDay[] => {
+    const today = toDateKey(new Date());
+    const start = startOfWeek(new Date());
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = addDays(start, index); const key = toDateKey(day);
+      return {
+        key, weekday: day.toLocaleDateString(undefined, { weekday: 'short' }),
+        date: day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        count: this.planningTasks().filter((task) => isOpen(task) && task.dueDate === key).length,
+        today: key === today,
+      };
+    });
+  });
 
-    let total = 0;
-    let done = 0;
-
-    for (const task of this.planningTasks()) {
-      if (task.status === 'CANCELLED' || !task.dueDate || task.dueDate < weekStartKey || task.dueDate >= weekEndKey) {
-        continue;
-      }
-      total += 1;
-      if (task.status === 'COMPLETED') {
-        done += 1;
-      }
+  readonly todayPlan = computed((): PlanItem[] => {
+    const today = toDateKey(new Date()); const items: PlanItem[] = [];
+    for (const event of this.events()) {
+      const canvasTask = event.canvasKind === 'DEADLINE' ? canvasDeadlineTask(event) : null;
+      if (canvasTask ? event.canvasCompleted || canvasTask.dueDate !== today : !overlapsDay(event.startAt, event.endAt, today)) continue;
+      const start = new Date(event.startAt); const end = new Date(event.endAt); const canvas = event.canvasKind === 'DEADLINE';
+      const canvasDue = canvasTask ? taskDateTime(canvasTask.dueDate!, canvasTask.dueTime ?? '23:59') : null;
+      items.push({
+        id: `event-${event.id}`, kind: canvas ? 'canvas' : 'event',
+        time: canvas ? (canvasTask?.dueTime && canvasDue ? formatTime(canvasDue) : 'Time not provided') : event.allDay ? 'All day' : formatTime(start),
+        endTime: event.allDay || canvas ? undefined : formatTime(end), title: event.title,
+        subtitle: canvas ? 'Canvas assignment' : event.description ?? 'Calendar event',
+        sortKey: canvasDue?.getTime() ?? (event.allDay ? 0 : start.getTime()), route: '/calendar', badge: canvas ? 'Due today' : 'Today',
+      });
     }
-
-    const percent = total === 0 ? 0 : Math.round((done / total) * 100);
-    return { done, total, percent };
+    for (const task of this.tasks()) {
+      if (!isOpen(task) || !task.dueDate || dueDateKey(task.dueDate) !== today) continue;
+      const due = taskDateTime(task.dueDate, task.dueTime ?? '23:59'); if (!due) continue;
+      items.push({
+        id: `task-${task.id}`, kind: 'task', time: task.dueTime ? formatTime(due) : 'Any time',
+        title: task.title, subtitle: task.description ?? priorityLabel(task), sortKey: due.getTime(), route: '/tasks',
+        badge: isOverdue(task, new Date()) ? 'Overdue' : 'Due today',
+      });
+    }
+    return items.sort((a, b) => a.sortKey - b.sortKey);
   });
 
   readonly upcomingDeadlines = computed((): DeadlineItem[] => {
-    const now = new Date();
-    const todayKey = toDateKey(now);
-    const horizon = addDays(startOfDay(now), 7);
-    const horizonKey = toDateKey(horizon);
-    const items: DeadlineItem[] = [];
-
+    const now = new Date(); const horizon = addDays(startOfDay(now), 7); const items: DeadlineItem[] = [];
+    const canvasIds = new Set(this.events().filter((event) => event.canvasKind === 'DEADLINE').map((event) => event.id));
     for (const task of this.planningTasks()) {
-      const isOpen = task.status === 'TODO' || task.status === 'IN_PROGRESS';
-      if (
-        !isOpen ||
-        !task.dueDate ||
-        task.dueDate >= horizonKey
-      ) {
-        continue;
-      }
-      const due = taskDateTime(task.dueDate, task.dueTime ?? '23:59');
-      if (!due) continue;
-      const overdue = task.dueDate < todayKey || (!!task.dueTime && due.getTime() < now.getTime());
+      if (!isOpen(task) || !task.dueDate || task.dueDate >= toDateKey(horizon)) continue;
+      const due = taskDateTime(task.dueDate, task.dueTime ?? '23:59'); if (!due) continue;
+      const overdue = isOverdue(task, now);
       items.push({
-        id: `${this.events().some(e => e.id === task.id && e.canvasKind === 'DEADLINE') ? 'event' : 'task'}-${task.id}`,
-        title: task.title,
-        when: `${overdue ? 'Overdue · ' : ''}${relativeDueLabel(task.dueDate)}${task.dueTime ? ` · ${formatTime(due)}` : ''}`,
-        sortKey: due.getTime(),
-        route: this.events().some(e => e.id === task.id && e.canvasKind === 'DEADLINE') ? '/calendar' : '/tasks',
-        overdue,
+        id: `${canvasIds.has(task.id) ? 'event' : 'task'}-${task.id}`, title: task.title,
+        subtitle: canvasIds.has(task.id) ? 'Canvas assignment' : task.description ?? priorityLabel(task),
+        dateLabel: overdue ? 'Overdue' : relativeDueLabel(task.dueDate),
+        timeLabel: task.dueTime ? formatTime(due) : canvasIds.has(task.id) ? 'Time not provided' : 'Any time',
+        badge: overdue ? 'Needs attention' : relativeBadge(task.dueDate), sortKey: due.getTime(),
+        route: canvasIds.has(task.id) ? '/calendar' : '/tasks', overdue,
       });
     }
-
     for (const event of this.events()) {
       if (event.canvasKind === 'DEADLINE') continue;
-      const start = new Date(event.startAt);
-      const end = new Date(event.endAt);
-      const dayKey = toDateKey(start);
-      if (end.getTime() <= now.getTime() || start.getTime() >= horizon.getTime()) {
-        continue;
-      }
+      const start = new Date(event.startAt); const end = new Date(event.endAt);
+      if (end <= now || start >= horizon) continue;
       items.push({
-        id: `event-${event.id}`,
-        title: event.title,
-        when: event.allDay
-          ? relativeDueLabel(dayKey)
-          : `${relativeDueLabel(dayKey)} · ${formatTimeRange(start, end)}`,
-        sortKey: start.getTime(),
-        route: '/calendar',
-        overdue: false,
+        id: `event-${event.id}`, title: event.title, subtitle: event.description ?? 'Calendar event',
+        dateLabel: relativeDueLabel(toDateKey(start)), timeLabel: event.allDay ? 'All day' : formatTime(start),
+        badge: 'Event', sortKey: start.getTime(), route: '/calendar', overdue: false,
       });
     }
-
     return items.sort((a, b) => a.sortKey - b.sortKey);
   });
 
+  readonly nextItems = computed((): NextItem[] => {
+    const now = new Date();
+    const canvasById = new Map(this.events().filter((event) => event.canvasKind === 'DEADLINE').map((event) => [event.id, event]));
+    return this.planningTasks().filter((task) => isOpen(task) && !!task.dueDate).map((task) => {
+      const due = taskDateTime(task.dueDate!, task.dueTime ?? '23:59')!;
+      const overdue = isOverdue(task, now); const canvas = canvasById.get(task.id);
+      return {
+        id: task.id, title: task.title,
+        subtitle: canvas ? 'Canvas assignment · completion is tracked in Prioritize only' : task.description ?? priorityLabel(task),
+        badge: overdue ? 'Overdue' : relativeBadge(task.dueDate!),
+        time: task.dueTime ? formatTime(due) : canvas ? 'Time not provided' : 'Any time',
+        sortKey: due.getTime(), urgency: overdue ? 0 : task.dueDate === toDateKey(now) ? 1 : 2,
+        priority: priorityRank(task), task: canvas ? undefined : task, canvas,
+      };
+    }).sort((a, b) => a.urgency - b.urgency || a.priority - b.priority || a.sortKey - b.sortKey).slice(0, 5);
+  });
+  readonly currentNext = computed(() => {
+    const items = this.nextItems(); return items.length ? items[Math.min(this.nextIndex(), items.length - 1)] : null;
+  });
+
   ngOnInit(): void {
-    this.api.getCanvasFeed().subscribe({
-      next: status => this.canvasConnected.set(status.connected),
-      error: () => this.canvasConnected.set(false),
-    });
+    this.api.getCanvasFeed().subscribe({ next: (status) => this.canvasConnected.set(status.connected), error: () => this.canvasConnected.set(false) });
     this.reload();
   }
-
   reload(): void {
-    this.loading.set(true);
-    this.error.set(null);
-
-    forkJoin({
-      tasks: this.api.listTasks(),
-      events: this.api.listCalendarEvents(),
-    }).subscribe({
-      next: ({ tasks, events }) => {
-        this.tasks.set(tasks);
-        this.events.set(events);
-        this.loading.set(false);
-      },
+    this.loading.set(true); this.error.set(null); this.actionError.set(null);
+    forkJoin({ tasks: this.api.listTasks(), events: this.api.listCalendarEvents() }).subscribe({
+      next: ({ tasks, events }) => { this.tasks.set(tasks); this.events.set(events); this.nextIndex.set(0); this.loading.set(false); },
       error: (err) => {
-        const statusCode = err?.status as number | undefined;
-        if (statusCode === 401) {
-          this.error.set('Your session expired. Redirecting to login…');
-        } else if (statusCode === 0) {
-          this.error.set('Cannot reach the API. Is the backend running on port 8080?');
-        } else {
-          this.error.set('Could not load dashboard.');
-        }
+        const status = err?.status as number | undefined;
+        this.error.set(status === 401 ? 'Your session expired. Redirecting to login…' : status === 0 ? 'Cannot reach the API. Is the backend running on port 8080?' : 'Could not load dashboard.');
         this.loading.set(false);
       },
     });
   }
-
+  moveNext(direction: number): void {
+    const length = this.nextItems().length; if (length) this.nextIndex.set((this.nextIndex() + direction + length) % length);
+  }
+  completeNext(): void {
+    const item = this.currentNext(); if (!item || this.completingId()) return;
+    this.completingId.set(item.id); this.actionError.set(null);
+    if (item.canvas) {
+      this.api.setCanvasAssignmentCompleted(item.canvas.id, true).subscribe({
+        next: () => { this.events.update((events) => events.map((event) => event.id === item.canvas!.id ? { ...event, canvasCompleted: true } : event)); this.finishCompletion(); },
+        error: () => this.failCompletion(),
+      });
+      return;
+    }
+    const task = item.task!;
+    this.api.updateTask(task.id, {
+      title: task.title, description: task.description, categoryId: task.categoryId, projectId: task.projectId,
+      dueDate: task.dueDate, dueTime: task.dueTime, estimatedMinutes: task.estimatedMinutes, priority: task.priority, status: 'COMPLETED',
+    }).subscribe({
+      next: (updated) => { this.tasks.update((tasks) => tasks.map((entry) => entry.id === updated.id ? updated : entry)); this.finishCompletion(); },
+      error: () => this.failCompletion(),
+    });
+  }
+  askAi(value: string): void {
+    void this.router.navigate(['/assistant'], { queryParams: { q: value.trim() || 'What should I work on next?' } });
+  }
   progressSegments(): boolean[] {
-    const progress = this.weeklyProgress();
-    const filled = Math.round((progress.percent / 100) * 10);
-    return Array.from({ length: 10 }, (_, i) => i < filled);
+    const filled = Math.round((this.weeklyProgress().percent / 100) * 7);
+    return Array.from({ length: 7 }, (_, index) => index < filled);
   }
+  private finishCompletion(): void { this.completingId.set(null); this.nextIndex.set(0); }
+  private failCompletion(): void { this.completingId.set(null); this.actionError.set('Could not mark this item complete. Please try again.'); }
 }
 
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+function isOpen(task: TaskDto): boolean { return task.status === 'TODO' || task.status === 'IN_PROGRESS'; }
+function priorityRank(task: TaskDto): number { return { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 }[task.priority ?? 'MEDIUM']; }
+function priorityLabel(task: TaskDto): string {
+  const priority = task.priority ?? 'MEDIUM';
+  return `${priority.charAt(0)}${priority.slice(1).toLowerCase()} priority`;
 }
-
-function startOfWeek(date: Date): Date {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const mondayOffset = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - mondayOffset);
-  return d;
+function startOfDay(date: Date): Date { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
+function startOfWeek(date: Date): Date { const d = startOfDay(date); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
+function addDays(date: Date, days: number): Date { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
+function toDateKey(date: Date): string { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+function dueDateKey(value: string): string { return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : toDateKey(new Date(value)); }
+function taskDateTime(dateValue: string, timeValue: string): Date | null {
+  const [y, m, d] = dueDateKey(dateValue).split('-').map(Number); const [hours, minutes] = timeValue.slice(0, 5).split(':').map(Number);
+  return [y, m, d, hours, minutes].some(Number.isNaN) ? null : new Date(y, m - 1, d, hours, minutes);
 }
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
+function isOverdue(task: TaskDto, now: Date): boolean {
+  if (!task.dueDate) return false; const today = toDateKey(now);
+  return task.dueDate < today || (task.dueDate === today && !!task.dueTime && (taskDateTime(task.dueDate, task.dueTime)?.getTime() ?? Infinity) < now.getTime());
 }
-
-function toDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+function overlapsDay(startAt: string, endAt: string, key: string): boolean {
+  const [y, m, d] = key.split('-').map(Number); const start = new Date(y, m - 1, d).getTime(); const end = new Date(y, m - 1, d + 1).getTime();
+  return new Date(startAt).getTime() < end && new Date(endAt).getTime() > start;
 }
-
-function dueDateKey(dueDate: string): string {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
-    return dueDate;
-  }
-  return toDateKey(new Date(dueDate));
+function formatTime(date: Date): string { return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); }
+function relativeDueLabel(date: string): string {
+  const today = toDateKey(new Date()); if (date === today) return 'Today';
+  if (date === toDateKey(addDays(new Date(), 1))) return 'Tomorrow';
+  return new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
-
-function overlapsDay(startAt: string, endAt: string, dayKey: string): boolean {
-  const [y, m, d] = dayKey.split('-').map(Number);
-  const dayStart = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
-  const dayEnd = new Date(y, m - 1, d + 1, 0, 0, 0, 0).getTime();
-  const start = new Date(startAt).getTime();
-  const end = new Date(endAt).getTime();
-  return start < dayEnd && end > dayStart;
-}
-
-function taskDateTime(dueDate: string, dueTime: string): Date | null {
-  const datePart = dueDateKey(dueDate);
-  const timePart = dueTime.length >= 5 ? dueTime.slice(0, 5) : dueTime;
-  const [y, m, d] = datePart.split('-').map(Number);
-  const [hh, mm] = timePart.split(':').map(Number);
-  if ([y, m, d, hh, mm].some((n) => Number.isNaN(n))) {
-    return null;
-  }
-  return new Date(y, m - 1, d, hh, mm, 0, 0);
-}
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-}
-
-function formatTimeRange(start: Date, end: Date): string {
-  return `${formatTime(start)} – ${formatTime(end)}`;
-}
-
-function parseTime(value: string): number {
-  const match = value.match(/(\d+):(\d+)/);
-  if (!match) {
-    return 0;
-  }
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  const isPm = value.toLowerCase().includes('pm');
-  const isAm = value.toLowerCase().includes('am');
-  let h = hours;
-  if (isPm && h < 12) {
-    h += 12;
-  }
-  if (isAm && h === 12) {
-    h = 0;
-  }
-  return h * 60 + minutes;
-}
-
-function relativeDueLabel(dueDate: string): string {
-  const today = toDateKey(new Date());
-  if (dueDate === today) {
-    return 'Today';
-  }
-  const due = new Date(`${dueDate}T12:00:00`);
-  const now = new Date();
-  now.setHours(12, 0, 0, 0);
-  const days = Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (days === 1) {
-    return 'Tomorrow';
-  }
-  return due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+function relativeBadge(date: string): string {
+  const today = startOfDay(new Date()); const due = new Date(`${date}T12:00:00`);
+  const days = Math.round((due.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12).getTime()) / 86_400_000);
+  return days <= 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : `In ${days} days`;
 }

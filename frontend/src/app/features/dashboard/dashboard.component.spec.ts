@@ -1,6 +1,7 @@
 import { of } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { TaskDto, CalendarEventDto } from '../../core/api/api.models';
@@ -18,6 +19,7 @@ describe('Dashboard deadlines', () => {
     TestBed.configureTestingModule({ providers: [
       { provide: ApiService, useValue: {} },
       { provide: AuthService, useValue: { currentUser: signal(null) } },
+      { provide: Router, useValue: { navigate: jasmine.createSpy('navigate') } },
     ] });
     component = TestBed.runInInjectionContext(() => new DashboardComponent());
   });
@@ -25,7 +27,7 @@ describe('Dashboard deadlines', () => {
   it('shows older overdue work and next-week tasks while excluding completed work', () => {
     component.tasks.set([task('old', '2026-08-01'), task('next', '2026-09-08'), task('done', '2026-09-02', 'COMPLETED'), task('far', '2026-09-20')]);
     expect(component.upcomingDeadlines().map(t => t.id)).toEqual(['task-old', 'task-next']);
-    expect(component.upcomingDeadlines()[0].when).toContain('Overdue');
+    expect(component.upcomingDeadlines()[0].dateLabel).toBe('Overdue');
   });
   it('excludes ended events but retains ongoing events and sorts timestamps consistently', () => {
     component.events.set([
@@ -44,6 +46,30 @@ describe('Dashboard deadlines', () => {
     component.tasks.set([task('late', '2026-09-05', 'TODO', '09:00'), task('later', '2026-09-05', 'TODO', '11:00')]);
     expect(component.stats().find(stat => stat.label === 'Overdue')?.value).toBe(1);
     expect(component.upcomingDeadlines().filter(item => item.overdue).length).toBe(1);
+  });
+  it('prioritizes overdue work before today and later work', () => {
+    component.tasks.set([
+      { ...task('today-high', '2026-09-05', 'TODO', '14:00'), priority: 'URGENT' } as TaskDto,
+      { ...task('overdue-low', '2026-09-04', 'TODO', '14:00'), priority: 'LOW' } as TaskDto,
+      { ...task('later', '2026-09-08', 'TODO', '14:00'), priority: 'HIGH' } as TaskDto,
+    ]);
+    expect(component.nextItems().map(item => item.id)).toEqual(['overdue-low', 'today-high', 'later']);
+    expect(component.currentNext()?.badge).toBe('Overdue');
+  });
+  it('marks a Canvas next item complete locally and removes it from the priority queue', () => {
+    const api = TestBed.inject(ApiService);
+    api.setCanvasAssignmentCompleted = jasmine.createSpy().and.returnValue(of(void 0));
+    const quiz = {
+      ...event('quiz-complete', '2026-09-05T14:00:00', '2026-09-05T14:00:00.001'),
+      canvasKind: 'DEADLINE', canvasCompleted: false,
+    } as CalendarEventDto;
+    component.events.set([quiz]);
+
+    component.completeNext();
+
+    expect(api.setCanvasAssignmentCompleted).toHaveBeenCalledWith('quiz-complete', true);
+    expect(component.events()[0].canvasCompleted).toBeTrue();
+    expect(component.nextItems()).toEqual([]);
   });
   it('does not count cancelled tasks against weekly completion', () => {
     component.tasks.set([task('cancelled', '2026-09-02', 'CANCELLED'), task('done', '2026-09-02', 'COMPLETED')]);
