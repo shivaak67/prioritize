@@ -1,97 +1,143 @@
 <section class="page prio-page assistant">
   <header class="page__header">
     <div>
-      <p class="prio-kicker">AI</p>
       <h1 class="prio-title">Ask AI</h1>
-      <p class="prio-lede">Ask questions about your tasks and schedule.</p>
+      <p class="prio-lede">A little clarity for your next step.</p>
     </div>
-    <div class="page__actions">
-      <button mat-stroked-button type="button" (click)="clearChat()" [disabled]="loading()">
-        <mat-icon>restart_alt</mat-icon>
-        Clear chat
-      </button>
-    </div>
+    <button
+      mat-stroked-button
+      type="button"
+      (click)="clearChat()"
+      [disabled]="loading()"
+    >
+      <mat-icon>restart_alt</mat-icon> Clear chat
+    </button>
   </header>
 
-  @if (!configured()) {
+  @if (configured() && (modelWarming() || !modelReady())) {
     <p class="assistant__banner" role="status">
-      Running in basic mode (no AI API key). Simple task questions still work. For full AI answers, set
-      <code>AI_ENABLED=true</code> and <code>AI_API_KEY</code> in the backend <code>.env</code>, then restart.
-    </p>
-  } @else if (modelWarming() || !modelReady()) {
-    <p class="assistant__banner assistant__banner--warmup" role="status">
-      <mat-icon>hourglass_top</mat-icon>
-      {{ warmupMessage() ?? 'Warming up the AI model. The first reply may take up to a minute.' }}
+      <mat-icon>hourglass_top</mat-icon
+      >{{
+        warmupMessage() ??
+          "Getting ready. Your assistant will be available shortly."
+      }}
     </p>
   }
-
   @if (error(); as message) {
-    <p class="assistant__banner assistant__banner--error" role="alert">{{ message }}</p>
+    <p class="assistant__banner assistant__banner--error" role="alert">
+      {{ message }}
+    </p>
   }
 
-  <article class="assistant__panel surface">
-    <div class="assistant__messages" aria-live="polite">
-      @for (message of messages(); track $index) {
-        <div class="assistant__message" [class.assistant__message--user]="message.role === 'user'">
-          <div class="assistant__avatar" [attr.data-role]="message.role">
-            <mat-icon>{{ message.role === 'user' ? 'person' : 'smart_toy' }}</mat-icon>
-          </div>
-          <div class="assistant__bubble">
-            <p>{{ message.content }}</p>
-          </div>
+  <article class="assistant__panel">
+    @if (messages().length <= 1 && !loading()) {
+      <div class="assistant__welcome">
+        <mat-icon class="assistant__sparkle" aria-hidden="true"
+          >auto_awesome</mat-icon
+        >
+        <h2>What would you like to work on?</h2>
+        <p>Ask about your tasks, deadlines, and schedule.</p>
+        <div class="assistant__prompt-list" aria-label="Suggested questions">
+          @for (prompt of starterPrompts; track prompt; let i = $index) {
+            <button
+              type="button"
+              class="assistant__prompt"
+              [attr.data-tone]="i"
+              (click)="usePrompt(prompt)"
+              [disabled]="configured() && !modelReady()"
+            >
+              <span class="assistant__prompt-icon"
+                ><mat-icon aria-hidden="true">{{
+                  ["checklist", "error_outline", "calendar_month", "add"][i]
+                }}</mat-icon></span
+              >
+              <span>{{ prompt }}</span
+              ><mat-icon class="assistant__arrow" aria-hidden="true"
+                >chevron_right</mat-icon
+              >
+            </button>
+          }
         </div>
-      }
-
-      @if (loading()) {
-        <div class="assistant__message">
-          <div class="assistant__avatar" data-role="assistant">
-            <mat-icon>smart_toy</mat-icon>
-          </div>
-          <div class="assistant__bubble assistant__bubble--typing">
-            <div class="assistant__typing-row">
-              <span></span><span></span><span></span>
-            </div>
-            @if (loadingMessage(); as status) {
-              <p class="assistant__loading-text">{{ status }}</p>
-            }
-          </div>
-        </div>
-      }
-
-      <div #scrollAnchor></div>
-    </div>
-
-  @if (messages().length <= 1 && !loading()) {
-    <div class="assistant__prompts">
-      <p>Try asking:</p>
-      <div class="assistant__prompt-list">
-        @for (prompt of starterPrompts; track prompt) {
-          <button mat-stroked-button type="button" (click)="usePrompt(prompt)">
-            {{ prompt }}
-          </button>
-        }
       </div>
-    </div>
-  }
+    } @else {
+      <div
+        class="assistant__messages"
+        role="log"
+        aria-label="Conversation"
+        aria-live="polite"
+      >
+        @for (message of messages(); track $index) {
+          <div
+            class="assistant__message"
+            [class.assistant__message--user]="message.role === 'user'"
+          >
+            <div class="assistant__avatar" [attr.data-role]="message.role">
+              <mat-icon aria-hidden="true">{{
+                message.role === "user" ? "person" : "auto_awesome"
+              }}</mat-icon
+              ><span class="sr-only">{{
+                message.role === "user" ? "You" : "Assistant"
+              }}</span>
+            </div>
+            <div class="assistant__bubble">
+              <p>{{ message.content }}</p>
+            </div>
+          </div>
+        }
+        @if (loading()) {
+          <div class="assistant__message">
+            <div class="assistant__avatar">
+              <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+            </div>
+            <div class="assistant__bubble assistant__bubble--typing">
+              <div class="assistant__typing-row" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <p class="assistant__loading-text">
+                {{ loadingMessage() ?? "Thinking…" }}
+              </p>
+            </div>
+          </div>
+        }
+        <div #scrollAnchor></div>
+      </div>
+    }
 
     <form class="assistant__composer" (ngSubmit)="send()">
-      <mat-form-field appearance="outline" class="assistant__field">
-        <mat-label>Ask about your tasks or schedule</mat-label>
+      <div class="assistant__mode" role="status">
+        <strong
+          ><mat-icon aria-hidden="true">bolt</mat-icon
+          >{{ configured() ? "AI assistant" : "Basic mode" }}</strong
+        >
+        <small>{{
+          configured()
+            ? "Your tasks and schedule, in context."
+            : "Simple task questions are available."
+        }}</small>
+      </div>
+      <label class="assistant__field">
+        <span class="sr-only">Ask about your tasks or schedule</span>
         <textarea
-          matInput
           rows="2"
           [ngModel]="input()"
           (ngModelChange)="input.set($event)"
           name="message"
           (keydown)="onKeydown($event)"
           [disabled]="loading()"
-          placeholder="e.g. What should I work on first today?"
+          placeholder="Ask about your tasks or schedule…"
         ></textarea>
-      </mat-form-field>
-      <button mat-flat-button color="primary" type="submit" [disabled]="loading() || !input().trim() || (configured() && !modelReady())">
-        <mat-icon>send</mat-icon>
-        Send
+      </label>
+      <button
+        class="assistant__send"
+        type="submit"
+        aria-label="Send message"
+        [disabled]="
+          loading() || !input().trim() || (configured() && !modelReady())
+        "
+      >
+        <mat-icon aria-hidden="true">send</mat-icon>
       </button>
     </form>
+    <p class="assistant__hint">Enter to send · Shift + Enter for a new line</p>
   </article>
 </section>

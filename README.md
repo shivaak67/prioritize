@@ -6,13 +6,13 @@ AI-powered productivity and academic planning platform with Canvas Calendar Feed
 
 **Live app:** [theprioritize.com](https://theprioritize.com/) · **Default branch:** [main](https://github.com/shivaak67/prioritize/tree/main)
 
-Captured from the deployed application on September 15, 2026. Each screenshot shows the website with its left navigation visible, without browser tabs or address bars. Private Canvas feed URLs are excluded.
+Dashboard, Tasks, Calendar, Ask AI, and Settings screenshots show the redesigned UI captured locally with sample data on October 6, 2026; they are not deployment confirmation. Reminders, Insights, and Focus screenshots were captured from the deployed application on September 15, 2026. Private Canvas feed URLs are excluded.
 
 ### Ask AI — plan with your actual tasks and Canvas deadlines
 
-Ask natural-language questions about your workload, deadlines, and schedule. The OpenAI-powered assistant uses your task and calendar context, including imported Canvas assignments, and can create or update tasks and events. Below, it retrieves today's Canvas assignments and their exact due times.
+Start with a suggested question or use the message composer to ask about your workload, deadlines, and schedule. The OpenAI-powered assistant uses task and calendar context and can create or update tasks and events when configured. The preview below shows Basic mode, which supports simple task questions without an AI connection.
 
-![Live AI assistant answering a question about Canvas deadlines](docs/screenshots/ai-live.png)
+![Redesigned Ask AI welcome screen with suggested questions and message composer](docs/screenshots/ai-redesign.png)
 
 ### SMS reminders — get deadline alerts on your phone
 
@@ -24,21 +24,21 @@ Schedule text messages for personal tasks, Canvas assignments, and calendar even
 
 ### Dashboard — see what needs attention
 
-Due Today, Overdue, This Week, and weekly assignment progress combine personal tasks and Canvas assignments. Today's plan shows upcoming deadlines with direct access to the AI assistant.
+Due Today, Overdue, This Week, and weekly progress combine personal tasks and Canvas assignments. A next-up card, today's plan, and quick actions help you choose what to work on next.
 
-![Live dashboard with today's Canvas deadlines and AI shortcuts](docs/screenshots/dashboard-live.png)
+![Redesigned dashboard with workload summaries, next-up task, and today's plan](docs/screenshots/dashboard-redesign.png)
 
 ### Tasks and Canvas assignments
 
-Search and filter your work, edit personal tasks, and mark Canvas assignments complete or reopen them. Canvas completion is tracked in Prioritize only; it does not submit work or change Canvas. Date-only deadlines say when Canvas has not provided a time; you can enter an exact local deadline in Calendar.
+Search and filter a compact task list, switch between Open, Due today, This week, and Completed views, and add tasks or time blocks from the side form. Edit personal tasks and mark Canvas assignments complete or reopen them. Canvas completion is tracked in Prioritize only; it does not submit work or change Canvas. Date-only deadlines say when Canvas has not provided a time; you can enter an exact local deadline in Calendar.
 
-![Live tasks and Canvas assignments with completion controls](docs/screenshots/tasks-live.png)
+![Redesigned Tasks page with quick filters, completion controls, and side creation form](docs/screenshots/tasks-redesign.png)
 
 ### Calendar — your deadlines and plans together
 
-See personal tasks, editable time blocks, Canvas assignments, and course events in one calendar.
+See personal tasks, editable time blocks, Canvas assignments, and course events in one month view. Select a day to inspect its plan in the adjacent detail panel, move between days, or edit a task or time block.
 
-![Live calendar showing Canvas deadlines and personal events](docs/screenshots/calendar-live.png)
+![Redesigned Calendar month view with selected-day plan and editing controls](docs/screenshots/calendar-redesign.png)
 
 ### Insights — one weekly total
 
@@ -52,11 +52,11 @@ Choose a task and a study duration, then start a timer or use the stopwatch to l
 
 ![Live Focus timer with study session options](docs/screenshots/focus-live.png)
 
-### Canvas connection — no developer key required
+### Settings — account, reminders, and Canvas
 
-Settings guides users through Canvas → Calendar → Calendar Feed. The read-only connection imports deadlines and events and refreshes automatically. The connected account below has 64 imported items.
+Settings groups your profile, notification preferences, and Canvas setup into clear cards. Connect through Canvas → Calendar → Calendar Feed with no developer key required. The read-only connection imports deadlines and events and refreshes automatically; the sample account below is not connected.
 
-![Live Canvas connection status and sync controls](docs/screenshots/canvas-settings-live.png)
+![Redesigned Settings with profile, notification preferences, and Canvas connection setup](docs/screenshots/settings-redesign.png)
 
 ## Overview
 

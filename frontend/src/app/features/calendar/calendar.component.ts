@@ -76,25 +76,100 @@ export class CalendarComponent implements OnInit, OnDestroy {
     ),
   );
 
-  readonly selectedDay = signal<string | null>(null);
+  readonly selectedDay = signal<string | null>(toLocalDateKey(new Date()));
+  readonly selectedDayLabel = computed(() => {
+    const key = this.selectedDay();
+    return key
+      ? new Date(key + 'T12:00:00').toLocaleDateString(undefined, {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+        })
+      : 'Choose a day';
+  });
+
+  moveDay(offset: number): void {
+    if (this.saving() || this.loading()) return;
+    const date = new Date(
+      (this.selectedDay() ?? toLocalDateKey(new Date())) + 'T12:00:00',
+    );
+    date.setDate(date.getDate() + offset);
+    const monthChanged =
+      date.getMonth() !== this.viewMonth().getMonth() ||
+      date.getFullYear() !== this.viewMonth().getFullYear();
+    this.selectDay(toLocalDateKey(date));
+    if (monthChanged) {
+      this.viewMonth.set(startOfMonth(date));
+      this.reload();
+    }
+  }
+
+  chipTime(chip: CalendarChip): string {
+    if (chip.kind === 'task') {
+      const task = this.tasks().find((item) => item.id === chip.entityId);
+      return task?.dueTime
+        ? this.formatTime(new Date('2000-01-01T' + task.dueTime))
+        : 'Any time';
+    }
+    const event = this.events().find((item) => item.id === chip.entityId);
+    if (!event) return '';
+    if (event.allDay)
+      return event.canvasKind === 'DEADLINE'
+        ? 'Time not provided by Canvas'
+        : 'All day';
+    return (
+      this.formatTime(new Date(event.startAt)) +
+      (event.canvasKind === 'DEADLINE'
+        ? ''
+        : ' – ' + this.formatTime(new Date(event.endAt)))
+    );
+  }
+
+  chipDescription(chip: CalendarChip): string {
+    return (
+      (chip.kind === 'task' ? this.tasks() : this.events()).find(
+        (item) => item.id === chip.entityId,
+      )?.description ?? ''
+    );
+  }
+
+  private formatTime(date: Date): string {
+    return date.toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
   readonly canvasDetail = signal<CalendarEventDto | null>(null);
   deadlineTime = '';
   readonly savingDeadline = signal(false);
   readonly deadlineMessage = signal('');
   readonly deadlineTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   saveDeadlineTime(item: CalendarEventDto): void {
-    if (this.savingDeadline() || !/^\d{2}:\d{2}$/.test(this.deadlineTime)) return;
+    if (this.savingDeadline() || !/^\d{2}:\d{2}$/.test(this.deadlineTime))
+      return;
     this.savingDeadline.set(true);
     this.deadlineMessage.set('');
-    this.api.setCanvasDeadlineTime(item.id, this.deadlineTime, this.deadlineTimezone).subscribe({
-      next: updated => {
-        this.events.update(list => list.map(event => event.id === updated.id ? updated : event));
-        if (this.canvasDetail()?.id === updated.id) this.canvasDetail.set(updated);
-        this.savingDeadline.set(false);
-        this.deadlineMessage.set('Deadline saved. Existing reminders keep their scheduled times; review them in Reminders.');
-      },
-      error: () => { this.savingDeadline.set(false); this.deadlineMessage.set('Could not save the deadline. Please try again.'); },
-    });
+    this.api
+      .setCanvasDeadlineTime(item.id, this.deadlineTime, this.deadlineTimezone)
+      .subscribe({
+        next: (updated) => {
+          this.events.update((list) =>
+            list.map((event) => (event.id === updated.id ? updated : event)),
+          );
+          if (this.canvasDetail()?.id === updated.id)
+            this.canvasDetail.set(updated);
+          this.savingDeadline.set(false);
+          this.deadlineMessage.set(
+            'Deadline saved. Existing reminders keep their scheduled times; review them in Reminders.',
+          );
+        },
+        error: () => {
+          this.savingDeadline.set(false);
+          this.deadlineMessage.set(
+            'Could not save the deadline. Please try again.',
+          );
+        },
+      });
   }
   readonly completingCanvas = signal(false);
   toggleCanvasComplete(item: CalendarEventDto): void {
@@ -104,11 +179,23 @@ export class CalendarComponent implements OnInit, OnDestroy {
     this.error.set(null);
     this.api.setCanvasAssignmentCompleted(item.id, completed).subscribe({
       next: () => {
-        this.events.update(list => list.map(event => event.id === item.id ? { ...event, canvasCompleted: completed } : event));
-        if (this.canvasDetail()?.id === item.id) this.canvasDetail.set({ ...item, canvasCompleted: completed });
+        this.events.update((list) =>
+          list.map((event) =>
+            event.id === item.id
+              ? { ...event, canvasCompleted: completed }
+              : event,
+          ),
+        );
+        if (this.canvasDetail()?.id === item.id)
+          this.canvasDetail.set({ ...item, canvasCompleted: completed });
         this.completingCanvas.set(false);
       },
-      error: () => { this.completingCanvas.set(false); this.error.set('Could not update assignment completion. Please try again.'); },
+      error: () => {
+        this.completingCanvas.set(false);
+        this.error.set(
+          'Could not update assignment completion. Please try again.',
+        );
+      },
     });
   }
   readonly editor = signal<'new' | 'event' | 'task' | null>(null);
@@ -168,7 +255,7 @@ export class CalendarComponent implements OnInit, OnDestroy {
       new Date(current.getFullYear(), current.getMonth() + offset, 1),
     );
     this.editor.set(null);
-    this.selectedDay.set(null);
+    this.selectedDay.set(toLocalDateKey(this.viewMonth()));
     this.reload();
   }
   selectDay(key: string): void {
@@ -206,7 +293,9 @@ export class CalendarComponent implements OnInit, OnDestroy {
       if (!event) return;
       if (event.canvasKind) {
         this.canvasDetail.set(event);
-        this.deadlineTime = event.allDay ? '' : localInput(new Date(event.startAt)).slice(11, 16);
+        this.deadlineTime = event.allDay
+          ? ''
+          : localInput(new Date(event.startAt)).slice(11, 16);
         this.deadlineMessage.set('');
         this.editor.set(null);
         this.revealPanel();

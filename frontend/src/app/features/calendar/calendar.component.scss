@@ -305,3 +305,210 @@ button:focus-visible {
   max-height: 260px;
   overflow: auto;
 }
+
+.page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+.prio-title {
+  font-size: clamp(2rem, 3vw, 2.8rem);
+}
+.calendar-connection {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--prio-line);
+  border-radius: 14px;
+  background: #ffffffb8;
+  color: var(--prio-teal-deep);
+  text-decoration: none;
+}
+.calendar-connection span {
+  display: grid;
+  gap: 0.25rem;
+}
+.calendar-connection small {
+  color: var(--prio-ink-soft);
+}
+.calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 0.9fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+.surface {
+  box-shadow: var(--prio-shadow);
+  min-width: 0;
+}
+.cal__scroll {
+  overflow-x: auto;
+  border-radius: 10px;
+}
+.cal__weekdays,
+.cal__grid {
+  min-width: 490px;
+}
+.cal__cell {
+  min-height: 7.5rem;
+}
+.cal__cell--accent {
+  background: #e0f3f0;
+}
+.cal__nav h2 {
+  font-size: 1.6rem;
+}
+.cal__chip {
+  font-weight: 500;
+  white-space: normal;
+  display: block;
+}
+.cal__chip-title,
+.cal__chip small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal__chip small {
+  font-size: 0.6rem;
+  margin-top: 0.15rem;
+}
+.cal__cell--today .cal__day {
+  justify-content: space-between;
+  padding-inline: 0.4rem;
+}
+.cal__chip--event {
+  background: #d8f0ec;
+  color: var(--prio-teal-deep);
+}
+:host .cal__chip--deadline {
+  background: #fff0d3;
+  color: #8e4f00;
+}
+.calendar-hint {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1.2rem;
+  font-size: 0.72rem;
+}
+.calendar-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.calendar-legend i {
+  width: 0.55rem;
+  height: 0.55rem;
+  background: #db9300;
+  border-radius: 50%;
+}
+.calendar-legend .event-dot {
+  background: var(--prio-teal);
+  margin-left: 0.5rem;
+}
+.day-panel {
+  margin-top: 0;
+}
+.day-panel > .cal__head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.day-panel h2 {
+  font-size: 1.35rem;
+  margin: 0.35rem 0;
+}
+.day-navigation {
+  display: flex;
+  margin-left: auto;
+}
+.day-panel__title {
+  font-size: 1.15rem;
+  margin: 0.9rem 0 0.35rem;
+}
+.day-panel__count {
+  font-size: 0.8rem;
+  color: var(--prio-ink-soft);
+  margin: 0 0 1rem;
+}
+.day-panel__add button {
+  width: 100%;
+}
+.day-items button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem 0.5rem;
+  padding: 1rem;
+  color: var(--prio-ink);
+}
+.day-items strong {
+  grid-column: 1/-1;
+  font-family: var(--prio-font-display);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.day-items .day-item__kind {
+  grid-column: 1/-1;
+  color: var(--prio-teal);
+  font-weight: 600;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+.day-items .day-item__kind--deadline {
+  color: #985b06;
+}
+.day-items .day-item__time {
+  color: var(--prio-ink-soft);
+}
+.day-items .day-item__description {
+  grid-column: 1/-1;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--prio-ink-soft);
+  overflow-wrap: anywhere;
+}
+.day-items .day-item__action {
+  grid-column: 2;
+  justify-self: end;
+}
+.calendar-editor fieldset {
+  grid-template-columns: 1fr;
+}
+.editor-actions {
+  flex-wrap: wrap;
+}
+.canvas-detail {
+  overflow-wrap: anywhere;
+}
+.canvas-deadline-editor input {
+  max-width: 100%;
+}
+@media (max-width: 1200px) {
+  .calendar-layout {
+    grid-template-columns: 1fr;
+  }
+  .cal__cell {
+    min-height: 6rem;
+  }
+}
+@media (max-width: 800px) {
+  .page__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .day-panel > .cal__head {
+    flex-direction: row;
+  }
+  .cal__head > span {
+    white-space: normal;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prio-page {
+    animation: none;
+  }
+}

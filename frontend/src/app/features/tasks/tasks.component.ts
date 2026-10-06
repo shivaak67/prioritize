@@ -1,6 +1,12 @@
 import { canvasDeadlineTask } from '../../core/api/canvas-deadline';
+import { DOCUMENT } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormsModule,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -26,6 +32,21 @@ export class TasksComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
+  private readonly document = inject(DOCUMENT);
+  readonly composer = signal<'task' | 'event'>('task');
+  readonly quickViews = [
+    { value: 'open', label: 'Open' },
+    { value: 'today', label: 'Due today' },
+    { value: 'week', label: 'This week' },
+    { value: 'completed', label: 'Completed' },
+  ];
+
+  openComposer(kind: 'task' | 'event'): void {
+    this.composer.set(kind);
+    setTimeout(() =>
+      this.document.getElementById(kind + '-create-title')?.focus(),
+    );
+  }
 
   readonly loading = signal(true);
   readonly saving = signal(false);
@@ -47,10 +68,21 @@ export class TasksComponent implements OnInit {
     this.error.set(null);
     this.api.setCanvasAssignmentCompleted(event.id, completed).subscribe({
       next: () => {
-        this.events.update(list => list.map(item => item.id === event.id ? { ...item, canvasCompleted: completed } : item));
+        this.events.update((list) =>
+          list.map((item) =>
+            item.id === event.id
+              ? { ...item, canvasCompleted: completed }
+              : item,
+          ),
+        );
         this.completingCanvasId.set(null);
       },
-      error: () => { this.completingCanvasId.set(null); this.error.set('Could not update assignment completion. Please try again.'); },
+      error: () => {
+        this.completingCanvasId.set(null);
+        this.error.set(
+          'Could not update assignment completion. Please try again.',
+        );
+      },
     });
   }
   readonly search = signal('');
@@ -60,31 +92,50 @@ export class TasksComponent implements OnInit {
     const query = this.search().trim().toLocaleLowerCase();
     const today = toDatetimeLocalValue(new Date()).slice(0, 10);
     const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 6) % 7);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
     const weekStartKey = toDatetimeLocalValue(weekStart).slice(0, 10);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 7);
     const weekEndKey = toDatetimeLocalValue(weekEnd).slice(0, 10);
     const priorityRank = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-    return this.tasks().filter(task => {
-      const open = task.status === 'TODO' || task.status === 'IN_PROGRESS';
-      const matchesView = this.view() === 'all'
-        || (this.view() === 'open' && open)
-        || (this.view() === 'completed' && task.status === 'COMPLETED')
-        || (this.view() === 'today' && open && task.dueDate === today)
-        || (this.view() === 'week' && open && !!task.dueDate && task.dueDate >= weekStartKey && task.dueDate < weekEndKey)
-        || (this.view() === 'overdue' && open && !!task.dueDate && (task.dueDate < today
-          || (task.dueDate === today && !!task.dueTime && new Date(`${task.dueDate}T${task.dueTime}`).getTime() < Date.now())));
-      return matchesView && `${task.title} ${task.description ?? ''}`.toLocaleLowerCase().includes(query);
-    }).sort((a, b) => {
-      if (this.sort() === 'title') return a.title.localeCompare(b.title);
-      if (this.sort() === 'priority') {
-        const diff = priorityRank[a.priority] - priorityRank[b.priority];
-        if (diff) return diff;
-      }
-      const due = (task: TaskDto) => `${task.dueDate ?? '9999-12-31'}T${task.dueTime ?? '23:59:59'}`;
-      return due(a).localeCompare(due(b)) || a.title.localeCompare(b.title);
-    });
+    return this.tasks()
+      .filter((task) => {
+        const open = task.status === 'TODO' || task.status === 'IN_PROGRESS';
+        const matchesView =
+          this.view() === 'all' ||
+          (this.view() === 'open' && open) ||
+          (this.view() === 'completed' && task.status === 'COMPLETED') ||
+          (this.view() === 'today' && open && task.dueDate === today) ||
+          (this.view() === 'week' &&
+            open &&
+            !!task.dueDate &&
+            task.dueDate >= weekStartKey &&
+            task.dueDate < weekEndKey) ||
+          (this.view() === 'overdue' &&
+            open &&
+            !!task.dueDate &&
+            (task.dueDate < today ||
+              (task.dueDate === today &&
+                !!task.dueTime &&
+                new Date(`${task.dueDate}T${task.dueTime}`).getTime() <
+                  Date.now())));
+        return (
+          matchesView &&
+          `${task.title} ${task.description ?? ''}`
+            .toLocaleLowerCase()
+            .includes(query)
+        );
+      })
+      .sort((a, b) => {
+        if (this.sort() === 'title') return a.title.localeCompare(b.title);
+        if (this.sort() === 'priority') {
+          const diff = priorityRank[a.priority] - priorityRank[b.priority];
+          if (diff) return diff;
+        }
+        const due = (task: TaskDto) =>
+          `${task.dueDate ?? '9999-12-31'}T${task.dueTime ?? '23:59:59'}`;
+        return due(a).localeCompare(due(b)) || a.title.localeCompare(b.title);
+      });
   });
 
   clearFilters(): void {
@@ -94,11 +145,21 @@ export class TasksComponent implements OnInit {
   }
 
   statusLabel(status: TaskStatus): string {
-    return { TODO: 'To do', IN_PROGRESS: 'In progress', COMPLETED: 'Completed', CANCELLED: 'Cancelled' }[status];
+    return {
+      TODO: 'To do',
+      IN_PROGRESS: 'In progress',
+      COMPLETED: 'Completed',
+      CANCELLED: 'Cancelled',
+    }[status];
   }
 
   readonly priorities: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
-  readonly statuses: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+  readonly statuses: TaskStatus[] = [
+    'TODO',
+    'IN_PROGRESS',
+    'COMPLETED',
+    'CANCELLED',
+  ];
 
   readonly form = this.fb.nonNullable.group({
     title: ['', [Validators.required, Validators.maxLength(255)]],
@@ -123,30 +184,53 @@ export class TasksComponent implements OnInit {
   });
 
   readonly upcomingEvents = computed(() =>
-    this.events().filter(event => !event.canvasKind && inEventWindow(event)).sort(
-      (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
-    ),
+    this.events()
+      .filter((event) => !event.canvasKind && inEventWindow(event))
+      .sort(
+        (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+      ),
   );
 
-  readonly canvasAssignments = computed(() => this.events().filter(event => {
-    if (event.canvasKind !== 'DEADLINE') return false;
-    const task = canvasDeadlineTask(event);
-    const today = toDatetimeLocalValue(new Date()).slice(0, 10);
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 6) % 7);
-    const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7);
-    const due = task.dueDate!;
-    const open = !event.canvasCompleted;
-    const matches = this.view() === 'all' || (this.view() === 'open' && open)
-      || (this.view() === 'completed' && !open)
-      || (this.view() === 'today' && open && due === today)
-      || (this.view() === 'week' && open && due >= toDatetimeLocalValue(weekStart).slice(0, 10) && due < toDatetimeLocalValue(weekEnd).slice(0, 10))
-      || (this.view() === 'overdue' && open && (due < today || (!!task.dueTime && new Date(event.startAt).getTime() < Date.now())));
-    return matches && `${task.title} ${task.description ?? ''}`.toLocaleLowerCase().includes(this.search().trim().toLocaleLowerCase());
-  })
-    .sort((a, b) => a.startAt.localeCompare(b.startAt)));
-  readonly canvasEvents = computed(() => this.events().filter(event => event.canvasKind === 'EVENT' && inEventWindow(event))
-    .sort((a, b) => a.startAt.localeCompare(b.startAt)));
+  readonly canvasAssignments = computed(() =>
+    this.events()
+      .filter((event) => {
+        if (event.canvasKind !== 'DEADLINE') return false;
+        const task = canvasDeadlineTask(event);
+        const today = toDatetimeLocalValue(new Date()).slice(0, 10);
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        const due = task.dueDate!;
+        const open = !event.canvasCompleted;
+        const matches =
+          this.view() === 'all' ||
+          (this.view() === 'open' && open) ||
+          (this.view() === 'completed' && !open) ||
+          (this.view() === 'today' && open && due === today) ||
+          (this.view() === 'week' &&
+            open &&
+            due >= toDatetimeLocalValue(weekStart).slice(0, 10) &&
+            due < toDatetimeLocalValue(weekEnd).slice(0, 10)) ||
+          (this.view() === 'overdue' &&
+            open &&
+            (due < today ||
+              (!!task.dueTime &&
+                new Date(event.startAt).getTime() < Date.now())));
+        return (
+          matches &&
+          `${task.title} ${task.description ?? ''}`
+            .toLocaleLowerCase()
+            .includes(this.search().trim().toLocaleLowerCase())
+        );
+      })
+      .sort((a, b) => a.startAt.localeCompare(b.startAt)),
+  );
+  readonly canvasEvents = computed(() =>
+    this.events()
+      .filter((event) => event.canvasKind === 'EVENT' && inEventWindow(event))
+      .sort((a, b) => a.startAt.localeCompare(b.startAt)),
+  );
   readonly eventEditForm = this.fb.nonNullable.group({
     title: ['', [Validators.required, Validators.maxLength(255)]],
     startLocal: ['', Validators.required],
@@ -158,8 +242,12 @@ export class TasksComponent implements OnInit {
     if (event.canvasKind || this.savingEventEdit()) return;
     this.editingEventId.set(event.id);
     this.eventEditError.set(null);
-    this.eventEditForm.reset({ title: event.title, startLocal: toDatetimeLocalValue(new Date(event.startAt)),
-      endLocal: toDatetimeLocalValue(new Date(event.endAt)), allDay: event.allDay });
+    this.eventEditForm.reset({
+      title: event.title,
+      startLocal: toDatetimeLocalValue(new Date(event.startAt)),
+      endLocal: toDatetimeLocalValue(new Date(event.endAt)),
+      allDay: event.allDay,
+    });
   }
 
   cancelEventEdit(): void {
@@ -168,37 +256,57 @@ export class TasksComponent implements OnInit {
 
   saveEventEdit(event: CalendarEventDto): void {
     if (event.canvasKind || this.savingEventEdit()) return;
-    this.eventEditForm.controls.title.setValue(this.eventEditForm.controls.title.value.trim());
+    this.eventEditForm.controls.title.setValue(
+      this.eventEditForm.controls.title.value.trim(),
+    );
     this.eventEditError.set(null);
     if (this.eventEditForm.invalid) {
       this.eventEditForm.markAllAsTouched();
       this.eventEditError.set('Enter a title and valid start and end times.');
       return;
     }
-    const { title, startLocal, endLocal, allDay } = this.eventEditForm.getRawValue();
-    const startAt = localInputToIso(startLocal), endAt = localInputToIso(endLocal);
+    const { title, startLocal, endLocal, allDay } =
+      this.eventEditForm.getRawValue();
+    const startAt = localInputToIso(startLocal),
+      endAt = localInputToIso(endLocal);
     if (!startAt || !endAt || new Date(endAt) <= new Date(startAt)) {
       this.eventEditError.set('End must be after start.');
       return;
     }
     this.savingEventEdit.set(true);
-    this.api.updateCalendarEvent(event.id, { title, startAt, endAt, allDay,
-      description: event.description, categoryId: event.categoryId }).subscribe({
-      next: updated => {
-        this.events.update(list => list.map(item => item.id === updated.id ? updated : item));
-        this.savingEventEdit.set(false);
-        this.editingEventId.set(null);
-      },
-      error: () => {
-        this.savingEventEdit.set(false);
-        this.eventEditError.set('Could not update the time block. Your changes are still here; try again.');
-      },
-    });
+    this.api
+      .updateCalendarEvent(event.id, {
+        title,
+        startAt,
+        endAt,
+        allDay,
+        description: event.description,
+        categoryId: event.categoryId,
+      })
+      .subscribe({
+        next: (updated) => {
+          this.events.update((list) =>
+            list.map((item) => (item.id === updated.id ? updated : item)),
+          );
+          this.savingEventEdit.set(false);
+          this.editingEventId.set(null);
+        },
+        error: () => {
+          this.savingEventEdit.set(false);
+          this.eventEditError.set(
+            'Could not update the time block. Your changes are still here; try again.',
+          );
+        },
+      });
   }
 
   ngOnInit(): void {
     const view = this.route.snapshot.queryParamMap.get('view');
-    if (view && ['all', 'open', 'completed', 'today', 'week', 'overdue'].includes(view)) this.view.set(view);
+    if (
+      view &&
+      ['all', 'open', 'completed', 'today', 'week', 'overdue'].includes(view)
+    )
+      this.view.set(view);
     this.prefillEventTimes();
     this.reload();
   }
@@ -221,7 +329,9 @@ export class TasksComponent implements OnInit {
         if (statusCode === 401) {
           this.error.set('Your session expired. Redirecting to login…');
         } else if (statusCode === 0) {
-          this.error.set('Cannot reach the API. Is the backend running on port 8080?');
+          this.error.set(
+            'Cannot reach the API. Is the backend running on port 8080?',
+          );
         } else {
           this.error.set('Could not load tasks and time blocks.');
         }
@@ -244,7 +354,13 @@ export class TasksComponent implements OnInit {
     this.api.createTask(payload).subscribe({
       next: (created) => {
         this.tasks.update((list) => [created, ...list]);
-        this.form.reset({ title: '', dueDate: '', dueTime: '', priority: 'MEDIUM', status: 'TODO' });
+        this.form.reset({
+          title: '',
+          dueDate: '',
+          dueTime: '',
+          priority: 'MEDIUM',
+          status: 'TODO',
+        });
         this.saving.set(false);
       },
       error: (err) => {
@@ -261,7 +377,9 @@ export class TasksComponent implements OnInit {
 
   submitEvent(): void {
     if (this.submittingEvent()) return;
-    this.eventForm.controls.title.setValue(this.eventForm.controls.title.value.trim());
+    this.eventForm.controls.title.setValue(
+      this.eventForm.controls.title.value.trim(),
+    );
     this.eventFormError.set(null);
     this.eventFormSuccess.set(null);
 
@@ -285,12 +403,18 @@ export class TasksComponent implements OnInit {
 
     this.submittingEvent.set(true);
     this.api
-      .createCalendarEvent({ title: title.trim(), startAt, endAt, allDay: false })
+      .createCalendarEvent({
+        title: title.trim(),
+        startAt,
+        endAt,
+        allDay: false,
+      })
       .subscribe({
         next: (created) => {
           this.events.update((list) =>
             [...list, created].sort(
-              (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+              (a, b) =>
+                new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
             ),
           );
           this.eventFormSuccess.set('Time block added.');
@@ -315,7 +439,9 @@ export class TasksComponent implements OnInit {
     this.error.set(null);
     this.api.deleteCalendarEvent(event.id).subscribe({
       next: () => {
-        this.events.update((list) => list.filter((item) => item.id !== event.id));
+        this.events.update((list) =>
+          list.filter((item) => item.id !== event.id),
+        );
       },
       error: () => this.error.set('Could not delete time block.'),
     });
@@ -337,7 +463,9 @@ export class TasksComponent implements OnInit {
   }
 
   saveEdit(task: TaskDto): void {
-    this.editForm.controls.title.setValue(this.editForm.controls.title.value.trim());
+    this.editForm.controls.title.setValue(
+      this.editForm.controls.title.value.trim(),
+    );
     if (this.editForm.invalid) {
       this.editForm.markAllAsTouched();
       return;
@@ -355,7 +483,9 @@ export class TasksComponent implements OnInit {
       })
       .subscribe({
         next: (updated) => {
-          this.tasks.update((list) => list.map((item) => (item.id === updated.id ? updated : item)));
+          this.tasks.update((list) =>
+            list.map((item) => (item.id === updated.id ? updated : item)),
+          );
           this.editingId.set(null);
         },
         error: () => this.error.set('Could not update task.'),
@@ -363,7 +493,8 @@ export class TasksComponent implements OnInit {
   }
 
   toggleComplete(task: TaskDto): void {
-    const nextStatus: TaskStatus = task.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
+    const nextStatus: TaskStatus =
+      task.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
     this.api
       .updateTask(task.id, {
         title: task.title,
@@ -378,7 +509,9 @@ export class TasksComponent implements OnInit {
       })
       .subscribe({
         next: (updated) => {
-          this.tasks.update((list) => list.map((item) => (item.id === updated.id ? updated : item)));
+          this.tasks.update((list) =>
+            list.map((item) => (item.id === updated.id ? updated : item)),
+          );
         },
         error: () => this.error.set('Could not update task.'),
       });
@@ -410,7 +543,8 @@ export class TasksComponent implements OnInit {
   }
 
   formatEventWhen(event: CalendarEventDto): string {
-    if (event.allDay) return `${event.canvasStartDate ?? toDatetimeLocalValue(new Date(event.startAt)).slice(0, 10)} · ${event.canvasKind === 'DEADLINE' ? 'Time not provided by Canvas' : 'All day'}`;
+    if (event.allDay)
+      return `${event.canvasStartDate ?? toDatetimeLocalValue(new Date(event.startAt)).slice(0, 10)} · ${event.canvasKind === 'DEADLINE' ? 'Time not provided by Canvas' : 'All day'}`;
     const start = new Date(event.startAt);
     const end = new Date(event.endAt);
     const date = start.toLocaleDateString(undefined, {
@@ -421,7 +555,11 @@ export class TasksComponent implements OnInit {
     const time = (d: Date) =>
       d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
     if (event.canvasKind === 'DEADLINE') return `${date} at ${time(start)}`;
-    const endDate = end.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const endDate = end.toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
     return `${date} · ${time(start)} – ${date === endDate ? '' : endDate + ' · '}${time(end)}`;
   }
 

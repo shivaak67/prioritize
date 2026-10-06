@@ -1,11 +1,16 @@
 <section class="page prio-page">
   <header class="page__header">
-    <p class="prio-kicker">Planning</p>
-    <h1 class="prio-title">Calendar</h1>
-    <p class="prio-lede">
-      Choose a day to make time. Select a task or time block to edit it.
-    </p>
-    <a routerLink="/settings">Connect or refresh Canvas in Settings →</a>
+    <div>
+      <h1 class="prio-title">Calendar</h1>
+      <p class="prio-lede">Make time for what matters.</p>
+    </div>
+    <a class="calendar-connection" routerLink="/settings"
+      ><mat-icon aria-hidden="true">school</mat-icon
+      ><span
+        ><strong>Bring your coursework together</strong
+        ><small>Manage your Canvas calendar feed in Settings.</small></span
+      ><mat-icon aria-hidden="true">arrow_forward</mat-icon></a
+    >
   </header>
   @if (error()) {
     <p class="cal__banner cal__banner--error" role="alert">
@@ -15,250 +20,362 @@
   @if (success()) {
     <p class="cal__banner" role="status">{{ success() }}</p>
   }
-  <div class="cal surface">
-    <div class="cal__head">
-      <div class="cal__nav">
-        <button
-          mat-icon-button
-          (click)="prevMonth()"
-          aria-label="Previous month"
-          [disabled]="saving()"
-        >
-          <mat-icon>chevron_left</mat-icon>
-        </button>
-        <h2>{{ monthLabel() }}</h2>
-        <button
-          mat-icon-button
-          (click)="nextMonth()"
-          aria-label="Next month"
-          [disabled]="saving()"
-        >
-          <mat-icon>chevron_right</mat-icon>
-        </button>
+  <div class="calendar-layout">
+    <div class="cal surface">
+      <div class="cal__head">
+        <div class="cal__nav">
+          <button
+            mat-icon-button
+            (click)="prevMonth()"
+            aria-label="Previous month"
+            [disabled]="saving()"
+          >
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <h2>{{ monthLabel() }}</h2>
+          <button
+            mat-icon-button
+            (click)="nextMonth()"
+            aria-label="Next month"
+            [disabled]="saving()"
+          >
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+        <span>{{
+          loading() ? "Loading…" : monthItemCount() + " scheduled entries"
+        }}</span>
       </div>
-      <span>{{
-        loading() ? "Loading…" : monthItemCount() + " scheduled entries"
-      }}</span>
-    </div>
-    <div class="cal__weekdays">
-      @for (day of weekdays; track day) {
-        <span>{{ day }}</span>
-      }
-    </div>
-    <div class="cal__grid" [attr.aria-busy]="loading()">
-      @for (cell of cells(); track cell.key) {
-        <div
-          class="cal__cell"
-          [class.cal__cell--muted]="!cell.inMonth"
-          [class.cal__cell--accent]="cell.key === selectedDay()"
-          [class.cal__cell--today]="cell.isToday"
-        >
-          @if (cell.day != null) {
-            <button
-              type="button"
-              class="cal__day"
-              [disabled]="loading() || saving()"
-              (click)="selectDay(cell.key)"
-              [attr.aria-label]="'Plan ' + cell.key"
-              [attr.aria-pressed]="cell.key === selectedDay()"
+      <div
+        class="cal__scroll"
+        tabindex="0"
+        aria-label="Month calendar; scroll horizontally on small screens"
+      >
+        <div class="cal__weekdays">
+          @for (day of weekdays; track day) {
+            <span>{{ day }}</span>
+          }
+        </div>
+        <div class="cal__grid" [attr.aria-busy]="loading()">
+          @for (cell of cells(); track cell.key) {
+            <div
+              class="cal__cell"
+              [class.cal__cell--muted]="!cell.inMonth"
+              [class.cal__cell--accent]="cell.key === selectedDay()"
+              [class.cal__cell--today]="cell.isToday"
             >
-              {{ cell.day }}<span class="add-mark" aria-hidden="true">+</span>
-            </button>
-            <div class="cal__chips">
-              @for (chip of cell.chips.slice(0, 3); track chip.id) {
+              @if (cell.day != null) {
                 <button
                   type="button"
-                  class="cal__chip"
-                  [class.cal__chip--event]="chip.kind === 'event'"
+                  class="cal__day"
                   [disabled]="loading() || saving()"
-                  (click)="editItem(chip, cell.key)"
-                  [class.cal__chip--canvas]="!!chip.canvasKind"
-                  [attr.aria-label]="
-                    (chip.canvasKind ? 'View Canvas ' : 'Edit ') + chip.label
-                  "
-                >
-                  {{ chip.canvasKind ? "Canvas · " : "" }}{{ chip.label }}
-                </button>
-              }
-              @if (cell.chips.length > 3) {
-                <button
-                  type="button"
-                  class="cal__more"
                   (click)="selectDay(cell.key)"
-                  [disabled]="loading() || saving()"
+                  [attr.aria-label]="'Plan ' + cell.key"
+                  [attr.aria-pressed]="cell.key === selectedDay()"
                 >
-                  +{{ cell.chips.length - 3 }} more
+                  {{ cell.day
+                  }}<span class="add-mark" aria-hidden="true">+</span>
                 </button>
+                <div class="cal__chips">
+                  @for (chip of cell.chips.slice(0, 3); track chip.id) {
+                    <button
+                      type="button"
+                      class="cal__chip"
+                      [class.cal__chip--event]="chip.kind === 'event'"
+                      [class.cal__chip--deadline]="
+                        chip.kind === 'task' || chip.canvasKind === 'DEADLINE'
+                      "
+                      [disabled]="loading() || saving()"
+                      (click)="editItem(chip, cell.key)"
+                      [class.cal__chip--canvas]="!!chip.canvasKind"
+                      [attr.aria-label]="
+                        (chip.canvasKind ? 'View Canvas ' : 'Edit ') +
+                        chip.label +
+                        ', ' +
+                        chipTime(chip)
+                      "
+                    >
+                      <span class="cal__chip-title"
+                        >{{ chip.canvasKind ? "Canvas · " : ""
+                        }}{{ chip.label }}</span
+                      ><small>{{ chipTime(chip) }}</small>
+                    </button>
+                  }
+                  @if (cell.chips.length > 3) {
+                    <button
+                      type="button"
+                      class="cal__more"
+                      (click)="selectDay(cell.key)"
+                      [disabled]="loading() || saving()"
+                    >
+                      +{{ cell.chips.length - 3 }} more
+                    </button>
+                  }
+                </div>
               }
             </div>
           }
         </div>
-      }
-    </div>
-    <p class="calendar-hint">
-      Task deadlines and time blocks use your local timezone.
-    </p>
-  </div>
-  @if (selectedDay(); as day) {
-    <section class="surface day-panel" aria-labelledby="day-title">
-      <div class="cal__head">
-        <h2 id="day-title" tabindex="-1">Your plan · {{ day }}</h2>
-        <button
-          mat-flat-button
-          type="button"
-          (click)="addBlock(day)"
-          [disabled]="saving() || loading()"
-        >
-          Add time block
-        </button>
       </div>
-      @if (!selectedItems().length) {
-        <p>No tasks or time blocks yet. Reserve some time for what matters.</p>
-      }
-      <ul class="day-items">
-        @for (chip of selectedItems(); track chip.id) {
-          <li>
+      <div class="calendar-hint">
+        <span class="calendar-legend"
+          ><i></i> Deadline <i class="event-dot"></i> Time block / event</span
+        ><span>Times shown in {{ deadlineTimezone }}</span>
+      </div>
+    </div>
+    @if (selectedDay(); as day) {
+      <section class="surface day-panel" aria-labelledby="day-title">
+        <div class="cal__head">
+          <h2 id="day-title" tabindex="-1">{{ selectedDayLabel() }}</h2>
+          <div class="day-navigation">
             <button
+              mat-icon-button
               type="button"
-              (click)="editItem(chip, day)"
+              aria-label="Previous day"
+              (click)="moveDay(-1)"
               [disabled]="saving() || loading()"
             >
-              <span>{{
-                chip.canvasKind === "DEADLINE"
-                  ? "Canvas deadline"
-                  : chip.canvasKind
-                    ? "Canvas event"
-                    : chip.kind === "task"
-                      ? "Task"
-                      : "Time block"
-              }}</span>
-              {{ chip.label }}
-              <span>{{ chip.canvasKind ? "View →" : "Edit →" }}</span>
-            </button>
-          </li>
-        }
-      </ul>
-      @if (canvasDetail(); as item) {
-        <article class="canvas-detail">
-          <p class="prio-kicker">
-            {{
-              item.canvasKind === "DEADLINE"
-                ? "Canvas assignment deadline"
-                : "Canvas calendar event"
-            }}
-          </p>
-            <h3>{{ item.title }}</h3>
-            @if (item.canvasKind === 'DEADLINE') {
-              <p>{{ item.canvasCompleted ? 'Completed in Prioritize' : 'To do' }}</p>
-              <button type="button" (click)="toggleCanvasComplete(item)" [disabled]="completingCanvas()">
-                {{ completingCanvas() ? 'Saving…' : item.canvasCompleted ? 'Reopen assignment' : 'Mark complete' }}
-              </button>
-              <p>Completion is tracked here only; it does not submit work or change Canvas.</p>
-            }
-          @if (item.allDay && item.canvasStartDate) {
-            <p>{{ item.canvasStartDate }} · {{ item.canvasKind === "DEADLINE" ? "Time not provided by Canvas" : "All day" }}</p>
-          } @else {
-            <p>
-              {{ item.canvasKind === "DEADLINE" ? "Due" : "Starts" }}
-              {{ item.startAt | date: "medium" }}
-              @if (item.canvasKind !== "DEADLINE") {
-                · Ends {{ item.endAt | date: "medium" }}
-              }
-            </p>
-          }
-          @if (item.canvasKind === 'DEADLINE' && item.canvasStartDate) {
-            <div class="canvas-deadline-editor">
-              <label>Exact deadline time <input type="time" [(ngModel)]="deadlineTime" [disabled]="savingDeadline()" /></label>
-              <p>Timezone: {{ deadlineTimezone }}. Enter the time shown in Canvas. This stays in Prioritize through future syncs and does not change Canvas.</p>
-              <button type="button" mat-stroked-button (click)="saveDeadlineTime(item)" [disabled]="savingDeadline() || !deadlineTime">{{ savingDeadline() ? 'Saving…' : 'Save deadline time' }}</button>
-              <p>Existing reminders keep their scheduled times. Review them after saving a deadline.</p>
-              @if (deadlineMessage()) { <p role="status">{{ deadlineMessage() }}</p> }
-            </div>
-          }
-          @if (item.description) {
-            <p class="canvas-description">{{ item.description }}</p>
-          }
-          <p>
-            Synced from Canvas. Make changes there; Prioritize refreshes about
-            every 30 minutes.
-          </p>
-          @if (item.canvasUrl) {
-            <a [href]="item.canvasUrl" target="_blank" rel="noopener noreferrer"
-              >Open in Canvas ↗</a
-            >
-          }
-        </article>
-      }
-      @if (editor()) {
-        <form (ngSubmit)="save()" class="calendar-editor">
-          <h3>
-            {{
-              editor() === "new"
-                ? "New time block"
-                : editor() === "task"
-                  ? "Edit task"
-                  : "Edit time block"
-            }}
-          </h3>
-          @if (formError()) {
-            <p role="alert" class="cal__banner--error">{{ formError() }}</p>
-          }
-          <fieldset [disabled]="saving()">
-            <label
-              >Title<input
-                name="calendarTitle"
-                [(ngModel)]="title"
-                required
-                maxlength="255"
-            /></label>
-            @if (editor() === "task") {
-              <label
-                >Due date<input
-                  type="date"
-                  name="calendarDue"
-                  [(ngModel)]="dueDate" /></label
-              ><label
-                >Due time (optional)<input
-                  type="time"
-                  name="calendarTime"
-                  [(ngModel)]="dueTime"
-              /></label>
-            } @else {
-              <label
-                >Start<input
-                  type="datetime-local"
-                  name="calendarStart"
-                  [(ngModel)]="startLocal"
-                  required /></label
-              ><label
-                >End<input
-                  type="datetime-local"
-                  name="calendarEnd"
-                  [(ngModel)]="endLocal"
-                  required
-              /></label>
-              @if (allDay) {
-                <p>
-                  This is an all-day event. The end marks when it stops
-                  appearing (exclusive).
-                </p>
-              }
-            }
-          </fieldset>
-          <div class="editor-actions">
-            <button mat-flat-button type="submit" [disabled]="saving()">
-              {{ saving() ? "Saving…" : "Save changes" }}</button
+              <mat-icon>chevron_left</mat-icon></button
             ><button
-              mat-stroked-button
+              mat-icon-button
               type="button"
-              (click)="editor.set(null)"
-              [disabled]="saving()"
+              aria-label="Next day"
+              (click)="moveDay(1)"
+              [disabled]="saving() || loading()"
             >
-              Cancel
+              <mat-icon>chevron_right</mat-icon>
             </button>
           </div>
-        </form>
-      }
-    </section>
-  }
+        </div>
+        <h3 class="day-panel__title">Your plan</h3>
+        <p class="day-panel__count">
+          {{
+            loading()
+              ? "Loading your schedule…"
+              : selectedItems().length + " items · Make it a productive day."
+          }}
+        </p>
+        <div class="day-panel__add">
+          <button
+            mat-flat-button
+            type="button"
+            (click)="addBlock(day)"
+            [disabled]="saving() || loading()"
+          >
+            Add time block
+          </button>
+        </div>
+        @if (!loading() && !error() && !selectedItems().length) {
+          <p>
+            No tasks or time blocks yet. Reserve some time for what matters.
+          </p>
+        }
+        <ul class="day-items">
+          @for (chip of selectedItems(); track chip.id) {
+            <li>
+              <button
+                type="button"
+                (click)="editItem(chip, day)"
+                [disabled]="saving() || loading()"
+              >
+                <span
+                  class="day-item__kind"
+                  [class.day-item__kind--deadline]="
+                    chip.kind === 'task' || chip.canvasKind === 'DEADLINE'
+                  "
+                  >{{
+                    chip.canvasKind === "DEADLINE"
+                      ? "Canvas deadline"
+                      : chip.canvasKind
+                        ? "Canvas event"
+                        : chip.kind === "task"
+                          ? "Task"
+                          : "Time block"
+                  }}</span
+                >
+                <strong>{{ chip.label }}</strong>
+                <span class="day-item__time">{{ chipTime(chip) }}</span>
+                @if (chipDescription(chip)) {
+                  <span class="day-item__description">{{
+                    chipDescription(chip)
+                  }}</span>
+                }
+                <span class="day-item__action">{{
+                  chip.canvasKind ? "View →" : "Edit →"
+                }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+        @if (canvasDetail(); as item) {
+          <article class="canvas-detail">
+            <p class="prio-kicker">
+              {{
+                item.canvasKind === "DEADLINE"
+                  ? "Canvas assignment deadline"
+                  : "Canvas calendar event"
+              }}
+            </p>
+            <h3>{{ item.title }}</h3>
+            @if (item.canvasKind === "DEADLINE") {
+              <p>
+                {{ item.canvasCompleted ? "Completed in Prioritize" : "To do" }}
+              </p>
+              <button
+                type="button"
+                (click)="toggleCanvasComplete(item)"
+                [disabled]="completingCanvas()"
+              >
+                {{
+                  completingCanvas()
+                    ? "Saving…"
+                    : item.canvasCompleted
+                      ? "Reopen assignment"
+                      : "Mark complete"
+                }}
+              </button>
+              <p>
+                Completion is tracked here only; it does not submit work or
+                change Canvas.
+              </p>
+            }
+            @if (item.allDay && item.canvasStartDate) {
+              <p>
+                {{ item.canvasStartDate }} ·
+                {{
+                  item.canvasKind === "DEADLINE"
+                    ? "Time not provided by Canvas"
+                    : "All day"
+                }}
+              </p>
+            } @else {
+              <p>
+                {{ item.canvasKind === "DEADLINE" ? "Due" : "Starts" }}
+                {{ item.startAt | date: "medium" }}
+                @if (item.canvasKind !== "DEADLINE") {
+                  · Ends {{ item.endAt | date: "medium" }}
+                }
+              </p>
+            }
+            @if (item.canvasKind === "DEADLINE" && item.canvasStartDate) {
+              <div class="canvas-deadline-editor">
+                <label
+                  >Exact deadline time
+                  <input
+                    type="time"
+                    [(ngModel)]="deadlineTime"
+                    [disabled]="savingDeadline()"
+                /></label>
+                <p>
+                  Timezone: {{ deadlineTimezone }}. Enter the time shown in
+                  Canvas. This stays in Prioritize through future syncs and does
+                  not change Canvas.
+                </p>
+                <button
+                  type="button"
+                  mat-stroked-button
+                  (click)="saveDeadlineTime(item)"
+                  [disabled]="savingDeadline() || !deadlineTime"
+                >
+                  {{ savingDeadline() ? "Saving…" : "Save deadline time" }}
+                </button>
+                <p>
+                  Existing reminders keep their scheduled times. Review them
+                  after saving a deadline.
+                </p>
+                @if (deadlineMessage()) {
+                  <p role="status">{{ deadlineMessage() }}</p>
+                }
+              </div>
+            }
+            @if (item.description) {
+              <p class="canvas-description">{{ item.description }}</p>
+            }
+            <p>
+              Synced from Canvas. Make changes there; Prioritize refreshes about
+              every 30 minutes.
+            </p>
+            @if (item.canvasUrl) {
+              <a
+                [href]="item.canvasUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Open in Canvas ↗</a
+              >
+            }
+          </article>
+        }
+        @if (editor()) {
+          <form (ngSubmit)="save()" class="calendar-editor">
+            <h3>
+              {{
+                editor() === "new"
+                  ? "New time block"
+                  : editor() === "task"
+                    ? "Edit task"
+                    : "Edit time block"
+              }}
+            </h3>
+            @if (formError()) {
+              <p role="alert" class="cal__banner--error">{{ formError() }}</p>
+            }
+            <fieldset [disabled]="saving()">
+              <label
+                >Title<input
+                  name="calendarTitle"
+                  [(ngModel)]="title"
+                  required
+                  maxlength="255"
+              /></label>
+              @if (editor() === "task") {
+                <label
+                  >Due date<input
+                    type="date"
+                    name="calendarDue"
+                    [(ngModel)]="dueDate" /></label
+                ><label
+                  >Due time (optional)<input
+                    type="time"
+                    name="calendarTime"
+                    [(ngModel)]="dueTime"
+                /></label>
+              } @else {
+                <label
+                  >Start<input
+                    type="datetime-local"
+                    name="calendarStart"
+                    [(ngModel)]="startLocal"
+                    required /></label
+                ><label
+                  >End<input
+                    type="datetime-local"
+                    name="calendarEnd"
+                    [(ngModel)]="endLocal"
+                    required
+                /></label>
+                @if (allDay) {
+                  <p>
+                    This is an all-day event. The end marks when it stops
+                    appearing (exclusive).
+                  </p>
+                }
+              }
+            </fieldset>
+            <div class="editor-actions">
+              <button mat-flat-button type="submit" [disabled]="saving()">
+                {{ saving() ? "Saving…" : "Save changes" }}</button
+              ><button
+                mat-stroked-button
+                type="button"
+                (click)="editor.set(null)"
+                [disabled]="saving()"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        }
+      </section>
+    }
+  </div>
 </section>

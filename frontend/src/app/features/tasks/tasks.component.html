@@ -1,286 +1,521 @@
 <section class="page prio-page">
   <header class="page__header">
     <div>
-      <p class="prio-kicker">Work</p>
       <h1 class="prio-title">Tasks</h1>
-      <p class="prio-lede">
-        Add tasks to complete, or block time on your calendar with event time blocks.
-      </p>
+      <p class="prio-lede">A clear next step for every deadline.</p>
     </div>
   </header>
+  <div class="tasks__toolbar">
+    <button
+      mat-flat-button
+      type="button"
+      (click)="openComposer('task')"
+      [attr.aria-pressed]="composer() === 'task'"
+    >
+      <mat-icon>add</mat-icon> Add task
+    </button>
+    <button
+      mat-stroked-button
+      type="button"
+      (click)="openComposer('event')"
+      [attr.aria-pressed]="composer() === 'event'"
+    >
+      <mat-icon>calendar_month</mat-icon> Add time block
+    </button>
+  </div>
 
   @if (error(); as message) {
     <p class="crud__banner" role="alert">{{ message }}</p>
   }
 
-  <div class="tasks__add-row">
-    <article class="tasks__add-panel prio-panel">
-      <h2 class="tasks__add-title">Add task</h2>
-      <form class="tasks__task-form" [formGroup]="form" (ngSubmit)="submit()">
-        <label class="crud__field">
-          <span>Title</span>
-          <input type="text" formControlName="title" placeholder="e.g. Draft project brief" />
-          @if (form.controls.title.touched && form.controls.title.invalid) {
-            <small class="tasks__form-msg--error" role="alert">Enter a title of 1–255 characters.</small>
-          }
-        </label>
-        <label class="crud__field">
-          <span>Due date</span>
-          <input type="date" formControlName="dueDate" />
-        </label>
-        <label class="crud__field">
-          <span>Due time</span>
-          <input type="time" formControlName="dueTime" />
-        </label>
-        <label class="crud__field">
-          <span>Priority</span>
-          <select formControlName="priority">
-            @for (level of priorities; track level) {
-              <option [value]="level">{{ level }}</option>
-            }
-          </select>
-        </label>
-        <label class="crud__field">
-          <span>Status</span>
-          <select formControlName="status">
-            @for (status of statuses; track status) {
-              <option [value]="status">{{ statusLabel(status) }}</option>
-            }
-          </select>
-        </label>
-        <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
-          <mat-icon>add</mat-icon>
-          {{ saving() ? 'Adding…' : 'Add task' }}
-        </button>
-      </form>
-    </article>
-
-    <article class="tasks__add-panel prio-panel tasks__add-panel--event">
-      <h2 class="tasks__add-title">Add time block</h2>
-      <p class="tasks__add-hint">Reserve a slot on your calendar for classes, study, or meetings.</p>
-      <form class="tasks__event-form" [formGroup]="eventForm" (ngSubmit)="submitEvent()">
-        <label class="crud__field">
-          <span>Title</span>
-          <input type="text" formControlName="title" placeholder="e.g. Study session" />
-          @if (eventForm.controls.title.touched && eventForm.controls.title.invalid) {
-            <small class="tasks__form-msg--error" role="alert">Enter a title of 1–255 characters.</small>
-          }
-        </label>
-        <label class="crud__field">
-          <span>Start</span>
-          <input type="datetime-local" formControlName="startLocal" />
-        </label>
-        <label class="crud__field">
-          <span>End</span>
-          <input type="datetime-local" formControlName="endLocal" />
-        </label>
-
-        @if (eventFormError(); as message) {
-          <p class="tasks__form-msg tasks__form-msg--error" role="alert">{{ message }}</p>
-        }
-        @if (eventFormSuccess(); as message) {
-          <p class="tasks__form-msg">{{ message }}</p>
-        }
-
-        <button mat-flat-button color="primary" type="submit" [disabled]="submittingEvent()">
-          <mat-icon>event</mat-icon>
-          {{ submittingEvent() ? 'Saving…' : 'Add time block' }}
-        </button>
-      </form>
-    </article>
-  </div>
-
-  @if (loading()) {
-    <p class="crud__note"><mat-icon>hourglass_top</mat-icon> Loading…</p>
-  } @else {
-    <section class="tasks__section">
-      <h2 class="tasks__section-title">Your tasks</h2>
-      <div class="tasks__filters" aria-label="Task filters">
-        <label class="crud__field">
-          <span>Search tasks</span>
-          <input type="search" placeholder="Search title or description" [ngModel]="search()" (ngModelChange)="search.set($event)" />
-        </label>
-        <label class="crud__field">
-          <span>Show</span>
-          <select [ngModel]="view()" (ngModelChange)="view.set($event)">
-            <option value="open">Open tasks</option>
-            <option value="today">Due today</option>
-            <option value="week">Due this week</option>
-            <option value="overdue">Overdue</option>
-            <option value="completed">Completed</option>
-            <option value="all">All tasks</option>
-          </select>
-        </label>
-        <label class="crud__field">
-          <span>Sort by</span>
-          <select [ngModel]="sort()" (ngModelChange)="sort.set($event)">
-            <option value="due">Due date</option>
-            <option value="priority">Priority</option>
-            <option value="title">Title</option>
-          </select>
-        </label>
-        <button mat-stroked-button type="button" (click)="clearFilters()">Clear filters</button>
-      </div>
-      <p class="tasks__section-hint" role="status">Showing {{ visibleTasks().length }} of {{ tasks().length }} tasks</p>
-      @if (tasks().length === 0) {
-        <div class="prio-empty">
-          <div class="prio-empty__mark"><mat-icon>checklist</mat-icon></div>
-          <h3>No tasks yet</h3>
-          <p>Add a title above to start building your list.</p>
-        </div>
-      } @else if (visibleTasks().length === 0) {
-        <div class="prio-empty">
-          <h3>No matching tasks</h3>
-          <p>Try another search or show all tasks.</p>
-          <button mat-stroked-button type="button" (click)="clearFilters()">Show all tasks</button>
-        </div>
+  <div class="tasks__layout">
+    <div class="tasks__content">
+      @if (loading()) {
+        <p class="crud__note"><mat-icon>hourglass_top</mat-icon> Loading…</p>
       } @else {
-        <ul class="crud__list">
-          @for (task of visibleTasks(); track task.id) {
-            <li class="crud__item">
-              @if (editingId() === task.id) {
-                <form class="crud__edit" [formGroup]="editForm" (ngSubmit)="saveEdit(task)">
-                  <label class="crud__field">
-                    <span>Title</span>
-                    <input type="text" formControlName="title" />
-                    @if (editForm.controls.title.touched && editForm.controls.title.invalid) {
-                      <small class="tasks__form-msg--error" role="alert">Enter a title of 1–255 characters.</small>
-                    }
-                  </label>
-                  <label class="crud__field">
-                    <span>Due date</span>
-                    <input type="date" formControlName="dueDate" />
-                  </label>
-                  <label class="crud__field">
-                    <span>Due time</span>
-                    <input type="time" formControlName="dueTime" />
-                  </label>
-                  <label class="crud__field">
-                    <span>Priority</span>
-                    <select formControlName="priority">
-                      @for (level of priorities; track level) {
-                        <option [value]="level">{{ level }}</option>
-                      }
-                    </select>
-                  </label>
-                  <label class="crud__field">
-                    <span>Status</span>
-                    <select formControlName="status">
-                      @for (status of statuses; track status) {
-                          <option [value]="status">{{ statusLabel(status) }}</option>
-                      }
-                    </select>
-                  </label>
-                  <div class="crud__edit-actions">
-                    <button mat-flat-button color="primary" type="submit">Save</button>
-                    <button mat-stroked-button type="button" (click)="cancelEdit()">Cancel</button>
-                  </div>
-                </form>
-              } @else {
-                <div class="crud__item-main">
-                  <strong>{{ task.title }}</strong>
-                  <p>
-                    <span class="queue__level" [attr.data-level]="task.priority">{{ task.priority }}</span>
-                    · {{ statusLabel(task.status) }}
-                    @if (task.dueDate) {
-                      · due {{ formatDue(task) }}
-                    }
-                  </p>
-                </div>
-                <div class="crud__item-actions">
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    (click)="toggleComplete(task)"
-                    [attr.aria-label]="task.status === 'COMPLETED' ? 'Mark incomplete' : 'Mark complete'"
-                  >
-                    <mat-icon>{{ task.status === 'COMPLETED' ? 'undo' : 'check' }}</mat-icon>
-                    {{ task.status === 'COMPLETED' ? 'Reopen' : 'Complete' }}
-                  </button>
-                  <button mat-stroked-button type="button" (click)="startEdit(task)">
-                    <mat-icon>edit</mat-icon>
-                    Edit
-                  </button>
-                  <button mat-stroked-button type="button" (click)="remove(task)">
-                    <mat-icon>delete</mat-icon>
-                    Remove
-                  </button>
-                </div>
-              }
-            </li>
-          }
-        </ul>
-      }
-    </section>
-
-    @for (group of [{ title: 'Canvas assignments', items: canvasAssignments(), label: 'Assignment' }, { title: 'Canvas events', items: canvasEvents(), label: 'Canvas event' }]; track group.title) {
-      @if (group.items.length) {
-        <section class="tasks__section">
-          <h2 class="tasks__section-title">{{ group.title }}</h2>
-          <p class="tasks__section-hint">{{ group.title === 'Canvas assignments' ? 'Assignments matching your task filters.' : 'Events for the next 30 days.' }} Synced from Canvas; edit dates and titles in Canvas.</p>
-          <ul class="tasks__event-list">
-            @for (event of group.items; track event.id) {
-              <li class="tasks__event-item tasks__event-item--canvas" [class.tasks__event-item--completed]="event.canvasCompleted">
-                <div class="tasks__event-main">
-                  <span class="tasks__event-tag">{{ group.label }}</span>
-                  @if (event.canvasKind === 'DEADLINE') { <span>{{ event.canvasCompleted ? 'Completed' : 'To do' }}</span> }
-                  <strong>{{ event.title }}</strong>
-                  <p>{{ event.canvasKind === 'DEADLINE' ? 'Due ' : '' }}{{ formatEventWhen(event) }}</p>
-                </div>
-                @if (event.canvasKind === 'DEADLINE') {
-                  <button mat-stroked-button type="button" (click)="toggleCanvasComplete(event)" [disabled]="!!completingCanvasId()">
-                    {{ completingCanvasId() === event.id ? 'Saving…' : event.canvasCompleted ? 'Reopen' : 'Complete' }}
-                  </button>
-                }
-                @if (event.canvasUrl) {
-                  <a mat-stroked-button [href]="event.canvasUrl" target="_blank" rel="noopener noreferrer">Open in Canvas</a>
-                }
-              </li>
+        <section class="tasks__section tasks__queue prio-panel">
+          <h2 class="tasks__section-title">Your tasks</h2>
+          <div class="tasks__view-tabs" aria-label="Quick task filters">
+            @for (filter of quickViews; track filter.value) {
+              <button
+                type="button"
+                [class.is-active]="view() === filter.value"
+                [attr.aria-pressed]="view() === filter.value"
+                (click)="view.set(filter.value)"
+              >
+                {{ filter.label }}
+              </button>
             }
-          </ul>
-          @if (group.label === 'Assignment') { <p class="tasks__section-hint">Completion is tracked in Prioritize only. It does not submit work or change Canvas.</p> }
+          </div>
+          <div class="tasks__filters" aria-label="Task filters">
+            <label class="crud__field">
+              <span>Search tasks</span>
+              <input
+                type="search"
+                placeholder="Search title or description"
+                [ngModel]="search()"
+                (ngModelChange)="search.set($event)"
+              />
+            </label>
+            <label class="crud__field">
+              <span>Show</span>
+              <select [ngModel]="view()" (ngModelChange)="view.set($event)">
+                <option value="open">Open tasks</option>
+                <option value="today">Due today</option>
+                <option value="week">Due this week</option>
+                <option value="overdue">Overdue</option>
+                <option value="completed">Completed</option>
+                <option value="all">All tasks</option>
+              </select>
+            </label>
+            <label class="crud__field">
+              <span>Sort by</span>
+              <select [ngModel]="sort()" (ngModelChange)="sort.set($event)">
+                <option value="due">Due date</option>
+                <option value="priority">Priority</option>
+                <option value="title">Title</option>
+              </select>
+            </label>
+            <button mat-stroked-button type="button" (click)="clearFilters()">
+              Clear filters
+            </button>
+          </div>
+          <p class="tasks__section-hint" role="status">
+            Showing {{ visibleTasks().length }} of {{ tasks().length }} tasks
+          </p>
+          @if (tasks().length === 0) {
+            <div class="prio-empty">
+              <div class="prio-empty__mark"><mat-icon>checklist</mat-icon></div>
+              <h3>No tasks yet</h3>
+              <p>Use Add task to start building your list.</p>
+            </div>
+          } @else if (visibleTasks().length === 0) {
+            <div class="prio-empty">
+              <h3>No matching tasks</h3>
+              <p>Try another search or show all tasks.</p>
+              <button mat-stroked-button type="button" (click)="clearFilters()">
+                Show all tasks
+              </button>
+            </div>
+          } @else {
+            <div class="tasks__column-head" aria-hidden="true">
+              <span></span><span>Task</span><span>Priority</span><span>Due</span
+              ><span>Status</span><span></span>
+            </div>
+            <ul class="crud__list">
+              @for (task of visibleTasks(); track task.id) {
+                <li class="crud__item">
+                  @if (editingId() === task.id) {
+                    <form
+                      class="crud__edit"
+                      [formGroup]="editForm"
+                      (ngSubmit)="saveEdit(task)"
+                    >
+                      <label class="crud__field">
+                        <span>Title</span>
+                        <input type="text" formControlName="title" />
+                        @if (
+                          editForm.controls.title.touched &&
+                          editForm.controls.title.invalid
+                        ) {
+                          <small class="tasks__form-msg--error" role="alert"
+                            >Enter a title of 1–255 characters.</small
+                          >
+                        }
+                      </label>
+                      <label class="crud__field">
+                        <span>Due date</span>
+                        <input type="date" formControlName="dueDate" />
+                      </label>
+                      <label class="crud__field">
+                        <span>Due time</span>
+                        <input type="time" formControlName="dueTime" />
+                      </label>
+                      <label class="crud__field">
+                        <span>Priority</span>
+                        <select formControlName="priority">
+                          @for (level of priorities; track level) {
+                            <option [value]="level">{{ level }}</option>
+                          }
+                        </select>
+                      </label>
+                      <label class="crud__field">
+                        <span>Status</span>
+                        <select formControlName="status">
+                          @for (status of statuses; track status) {
+                            <option [value]="status">
+                              {{ statusLabel(status) }}
+                            </option>
+                          }
+                        </select>
+                      </label>
+                      <div class="crud__edit-actions">
+                        <button mat-flat-button color="primary" type="submit">
+                          Save
+                        </button>
+                        <button
+                          mat-stroked-button
+                          type="button"
+                          (click)="cancelEdit()"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  } @else {
+                    <button
+                      class="tasks__complete"
+                      type="button"
+                      (click)="toggleComplete(task)"
+                      [attr.aria-label]="
+                        (task.status === 'COMPLETED'
+                          ? 'Reopen '
+                          : 'Complete ') + task.title
+                      "
+                      [attr.aria-pressed]="task.status === 'COMPLETED'"
+                    >
+                      <mat-icon>{{
+                        task.status === "COMPLETED"
+                          ? "check_circle"
+                          : "radio_button_unchecked"
+                      }}</mat-icon>
+                    </button>
+                    <div class="crud__item-main">
+                      <strong
+                        [class.tasks__done]="task.status === 'COMPLETED'"
+                        >{{ task.title }}</strong
+                      >
+                      @if (task.description) {
+                        <p>{{ task.description }}</p>
+                      }
+                    </div>
+                    <span
+                      class="queue__level tasks__priority"
+                      [attr.data-level]="task.priority"
+                      >{{ task.priority }}</span
+                    >
+                    <span class="tasks__due">{{
+                      task.dueDate ? formatDue(task) : "No due date"
+                    }}</span>
+                    <span class="tasks__status">{{
+                      statusLabel(task.status)
+                    }}</span>
+                    <div class="crud__item-actions">
+                      <button
+                        mat-icon-button
+                        type="button"
+                        (click)="startEdit(task)"
+                        [attr.aria-label]="'Edit ' + task.title"
+                      >
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button
+                        mat-icon-button
+                        type="button"
+                        (click)="remove(task)"
+                        [attr.aria-label]="'Remove ' + task.title"
+                      >
+                        <mat-icon>delete_outline</mat-icon>
+                      </button>
+                    </div>
+                  }
+                </li>
+              }
+            </ul>
+          }
         </section>
-      }
-    }
 
+        @for (
+          group of [
+            {
+              title: "Canvas assignments",
+              items: canvasAssignments(),
+              label: "Assignment",
+            },
+            {
+              title: "Canvas events",
+              items: canvasEvents(),
+              label: "Canvas event",
+            },
+          ];
+          track group.title
+        ) {
+          @if (group.items.length) {
+            <section class="tasks__section">
+              <h2 class="tasks__section-title">{{ group.title }}</h2>
+              <p class="tasks__section-hint">
+                {{
+                  group.title === "Canvas assignments"
+                    ? "Assignments matching your task filters."
+                    : "Events for the next 30 days."
+                }}
+                Synced from Canvas; edit dates and titles in Canvas.
+              </p>
+              <ul class="tasks__event-list">
+                @for (event of group.items; track event.id) {
+                  <li
+                    class="tasks__event-item tasks__event-item--canvas"
+                    [class.tasks__event-item--completed]="event.canvasCompleted"
+                  >
+                    <div class="tasks__event-main">
+                      <span class="tasks__event-tag">{{ group.label }}</span>
+                      @if (event.canvasKind === "DEADLINE") {
+                        <span>{{
+                          event.canvasCompleted ? "Completed" : "To do"
+                        }}</span>
+                      }
+                      <strong>{{ event.title }}</strong>
+                      <p>
+                        {{ event.canvasKind === "DEADLINE" ? "Due " : ""
+                        }}{{ formatEventWhen(event) }}
+                      </p>
+                    </div>
+                    @if (event.canvasKind === "DEADLINE") {
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        (click)="toggleCanvasComplete(event)"
+                        [disabled]="!!completingCanvasId()"
+                      >
+                        {{
+                          completingCanvasId() === event.id
+                            ? "Saving…"
+                            : event.canvasCompleted
+                              ? "Reopen"
+                              : "Complete"
+                        }}
+                      </button>
+                    }
+                    @if (event.canvasUrl) {
+                      <a
+                        mat-stroked-button
+                        [href]="event.canvasUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >Open in Canvas</a
+                      >
+                    }
+                  </li>
+                }
+              </ul>
+              @if (group.label === "Assignment") {
+                <p class="tasks__section-hint">
+                  Completion is tracked in Prioritize only. It does not submit
+                  work or change Canvas.
+                </p>
+              }
+            </section>
+          }
+        }
+      }
+    </div>
+    <aside class="tasks__add-row" aria-label="Create work">
+      @if (composer() === "task") {
+        <article class="tasks__add-panel prio-panel">
+          <h2 class="tasks__add-title">Add task</h2>
+          <form
+            class="tasks__task-form"
+            [formGroup]="form"
+            (ngSubmit)="submit()"
+          >
+            <label class="crud__field">
+              <span>Title</span>
+              <input
+                type="text"
+                formControlName="title"
+                id="task-create-title"
+                placeholder="e.g. Finish lab report"
+              />
+              @if (form.controls.title.touched && form.controls.title.invalid) {
+                <small class="tasks__form-msg--error" role="alert"
+                  >Enter a title of 1–255 characters.</small
+                >
+              }
+            </label>
+            <label class="crud__field">
+              <span>Due date</span>
+              <input type="date" formControlName="dueDate" />
+            </label>
+            <label class="crud__field">
+              <span>Due time</span>
+              <input type="time" formControlName="dueTime" />
+            </label>
+            <label class="crud__field">
+              <span>Priority</span>
+              <select formControlName="priority">
+                @for (level of priorities; track level) {
+                  <option [value]="level">{{ level }}</option>
+                }
+              </select>
+            </label>
+            <label class="crud__field">
+              <span>Status</span>
+              <select formControlName="status">
+                @for (status of statuses; track status) {
+                  <option [value]="status">{{ statusLabel(status) }}</option>
+                }
+              </select>
+            </label>
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="saving()"
+            >
+              <mat-icon>add</mat-icon>
+              {{ saving() ? "Adding…" : "Add task" }}
+            </button>
+          </form>
+        </article>
+      }
+      @if (composer() === "event") {
+        <article class="tasks__add-panel prio-panel tasks__add-panel--event">
+          <h2 class="tasks__add-title">Add time block</h2>
+          <p class="tasks__add-hint">
+            Reserve a slot on your calendar for classes, study, or meetings.
+          </p>
+          <form
+            class="tasks__event-form"
+            [formGroup]="eventForm"
+            (ngSubmit)="submitEvent()"
+          >
+            <label class="crud__field">
+              <span>Title</span>
+              <input
+                type="text"
+                formControlName="title"
+                id="event-create-title"
+                placeholder="e.g. Study session"
+              />
+              @if (
+                eventForm.controls.title.touched &&
+                eventForm.controls.title.invalid
+              ) {
+                <small class="tasks__form-msg--error" role="alert"
+                  >Enter a title of 1–255 characters.</small
+                >
+              }
+            </label>
+            <label class="crud__field">
+              <span>Start</span>
+              <input type="datetime-local" formControlName="startLocal" />
+            </label>
+            <label class="crud__field">
+              <span>End</span>
+              <input type="datetime-local" formControlName="endLocal" />
+            </label>
+
+            @if (eventFormError(); as message) {
+              <p class="tasks__form-msg tasks__form-msg--error" role="alert">
+                {{ message }}
+              </p>
+            }
+            @if (eventFormSuccess(); as message) {
+              <p class="tasks__form-msg">{{ message }}</p>
+            }
+
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="submittingEvent()"
+            >
+              <mat-icon>event</mat-icon>
+              {{ submittingEvent() ? "Saving…" : "Add time block" }}
+            </button>
+          </form>
+        </article>
+      }
+    </aside>
+  </div>
+  @if (!loading()) {
     <section class="tasks__section">
       <h2 class="tasks__section-title">Your time blocks</h2>
-      <p class="tasks__section-hint">Calendar time blocks for the next 30 days.</p>
+      <p class="tasks__section-hint">
+        Calendar time blocks for the next 30 days.
+      </p>
       @if (upcomingEvents().length === 0) {
         <div class="prio-empty">
           <div class="prio-empty__mark"><mat-icon>event</mat-icon></div>
           <h3>No time blocks yet</h3>
-          <p>Use the form above to block time for classes, study sessions, or meetings.</p>
+          <p>
+            Use Add time block to reserve time for classes, study sessions, or
+            meetings.
+          </p>
         </div>
       } @else {
         <ul class="tasks__event-list">
           @for (event of upcomingEvents(); track event.id) {
             <li class="tasks__event-item">
               @if (editingEventId() === event.id) {
-                <form class="crud__edit" [formGroup]="eventEditForm" (ngSubmit)="saveEventEdit(event)">
-                  <label class="crud__field"><span>Title</span><input formControlName="title" /></label>
-                  <label class="crud__field"><span>Start</span><input type="datetime-local" formControlName="startLocal" /></label>
-                  <label class="crud__field"><span>End</span><input type="datetime-local" formControlName="endLocal" /></label>
-                  <label><input type="checkbox" formControlName="allDay" /> All day</label>
-                  @if (eventEditError(); as message) { <p class="tasks__form-msg--error" role="alert">{{ message }}</p> }
+                <form
+                  class="crud__edit"
+                  [formGroup]="eventEditForm"
+                  (ngSubmit)="saveEventEdit(event)"
+                >
+                  <label class="crud__field"
+                    ><span>Title</span><input formControlName="title"
+                  /></label>
+                  <label class="crud__field"
+                    ><span>Start</span
+                    ><input type="datetime-local" formControlName="startLocal"
+                  /></label>
+                  <label class="crud__field"
+                    ><span>End</span
+                    ><input type="datetime-local" formControlName="endLocal"
+                  /></label>
+                  <label
+                    ><input type="checkbox" formControlName="allDay" /> All
+                    day</label
+                  >
+                  @if (eventEditError(); as message) {
+                    <p class="tasks__form-msg--error" role="alert">
+                      {{ message }}
+                    </p>
+                  }
                   <div class="crud__edit-actions">
-                    <button mat-flat-button type="submit" [disabled]="savingEventEdit()">{{ savingEventEdit() ? 'Saving…' : 'Save' }}</button>
-                    <button mat-stroked-button type="button" [disabled]="savingEventEdit()" (click)="cancelEventEdit()">Cancel</button>
+                    <button
+                      mat-flat-button
+                      type="submit"
+                      [disabled]="savingEventEdit()"
+                    >
+                      {{ savingEventEdit() ? "Saving…" : "Save" }}
+                    </button>
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      [disabled]="savingEventEdit()"
+                      (click)="cancelEventEdit()"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </form>
               } @else {
-              <div class="tasks__event-main">
-                <span class="tasks__event-tag">Time block</span>
-                <strong>{{ event.title }}</strong>
-                <p>{{ formatEventWhen(event) }}</p>
-              </div>
-              <div class="crud__item-actions">
-              <button mat-stroked-button type="button" [disabled]="savingEventEdit()" (click)="startEventEdit(event)"><mat-icon>edit</mat-icon> Edit</button>
-              <button mat-stroked-button type="button" [disabled]="savingEventEdit()" (click)="removeEvent(event)">
-                <mat-icon>delete</mat-icon>
-                Remove
-              </button>
-              </div>
+                <div class="tasks__event-main">
+                  <span class="tasks__event-tag">Time block</span>
+                  <strong>{{ event.title }}</strong>
+                  <p>{{ formatEventWhen(event) }}</p>
+                </div>
+                <div class="crud__item-actions">
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    [disabled]="savingEventEdit()"
+                    (click)="startEventEdit(event)"
+                  >
+                    <mat-icon>edit</mat-icon> Edit
+                  </button>
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    [disabled]="savingEventEdit()"
+                    (click)="removeEvent(event)"
+                  >
+                    <mat-icon>delete</mat-icon>
+                    Remove
+                  </button>
+                </div>
               }
             </li>
           }

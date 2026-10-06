@@ -13,7 +13,8 @@ describe('Interactive calendar', () => {
       'listCalendarEvents',
       'updateTask',
       'createCalendarEvent',
-      'updateCalendarEvent', 'setCanvasDeadlineTime',
+      'updateCalendarEvent',
+      'setCanvasDeadlineTime',
     ]);
     api.listTasks.and.returnValue(of([]));
     api.listCalendarEvents.and.returnValue(of([]));
@@ -23,6 +24,33 @@ describe('Interactive calendar', () => {
     component = TestBed.runInInjectionContext(() => new CalendarComponent());
   });
   afterEach(() => component.ngOnDestroy());
+  it('loads the adjacent month when day navigation crosses a month boundary', () => {
+    component.loading.set(false);
+    component.viewMonth.set(new Date(2026, 9, 1));
+    component.selectedDay.set('2026-10-31');
+    component.moveDay(1);
+    expect(component.selectedDay()).toBe('2026-11-01');
+    expect(component.viewMonth().getMonth()).toBe(10);
+    expect(api.listCalendarEvents).toHaveBeenCalled();
+  });
+
+  it('keeps a date-only Canvas deadline distinct from an all-day event', () => {
+    component.events.set([
+      {
+        id: 'date-only',
+        allDay: true,
+        canvasKind: 'DEADLINE',
+      } as CalendarEventDto,
+    ]);
+    expect(
+      component.chipTime({
+        id: 'chip',
+        entityId: 'date-only',
+        kind: 'event',
+        label: 'Assignment',
+      }),
+    ).toBe('Time not provided by Canvas');
+  });
   it('keeps Canvas date-only entries on their source dates regardless of timezone', () => {
     const event = {
       canvasStartDate: '2026-11-01',
@@ -123,18 +151,34 @@ describe('Interactive calendar', () => {
     expect(eventDayKeys(event)).toEqual(['2026-09-09']);
   });
   it('saves a local deadline and keeps the imported item after a failed save', () => {
-    const original = { id: 'quiz', allDay: true, canvasKind: 'DEADLINE', canvasStartDate: '2026-09-13' } as CalendarEventDto;
-    const updated = { ...original, allDay: false, startAt: '2026-09-14T04:59:00Z' };
-    component.events.set([original]); component.canvasDetail.set(original);
+    const original = {
+      id: 'quiz',
+      allDay: true,
+      canvasKind: 'DEADLINE',
+      canvasStartDate: '2026-09-13',
+    } as CalendarEventDto;
+    const updated = {
+      ...original,
+      allDay: false,
+      startAt: '2026-09-14T04:59:00Z',
+    };
+    component.events.set([original]);
+    component.canvasDetail.set(original);
     component.deadlineTime = '23:59';
-    api.setCanvasDeadlineTime.and.returnValue(throwError(() => new Error('offline')));
+    api.setCanvasDeadlineTime.and.returnValue(
+      throwError(() => new Error('offline')),
+    );
     component.saveDeadlineTime(original);
     expect(component.canvasDetail()).toEqual(original);
     expect(component.savingDeadline()).toBeFalse();
-    api.setCanvasDeadlineTime.and.returnValue(of(updated)); component.saveDeadlineTime(original);
-    expect(api.setCanvasDeadlineTime).toHaveBeenCalledWith('quiz', '23:59', component.deadlineTimezone);
+    api.setCanvasDeadlineTime.and.returnValue(of(updated));
+    component.saveDeadlineTime(original);
+    expect(api.setCanvasDeadlineTime).toHaveBeenCalledWith(
+      'quiz',
+      '23:59',
+      component.deadlineTimezone,
+    );
     expect(component.events()[0].allDay).toBeFalse();
     expect(component.deadlineMessage()).toContain('Existing reminders');
   });
-
 });
