@@ -2,6 +2,7 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { MatIconModule } from '@angular/material/icon';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
@@ -10,7 +11,7 @@ import { CanvasFeedStatus } from '../../core/api/api.models';
 @Component({
   selector: 'app-canvas-connection',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink],
+  imports: [DatePipe, FormsModule, RouterLink, MatIconModule],
   templateUrl: './canvas-connection.component.html',
   styleUrl: './canvas-connection.component.scss',
 })
@@ -24,6 +25,7 @@ export class CanvasConnectionComponent implements OnInit {
   readonly message = signal('');
   readonly editing = signal(false);
   readonly confirmDisconnect = signal(false);
+  readonly showFeedUrl = signal(false);
   feedUrl = '';
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   ngOnInit(): void {
@@ -71,6 +73,7 @@ export class CanvasConnectionComponent implements OnInit {
         this.busy.set(false);
         if (!status.error) {
           this.feedUrl = '';
+          this.showFeedUrl.set(false);
           this.editing.set(false);
           this.message.set(message);
         }
@@ -97,6 +100,7 @@ export class CanvasConnectionComponent implements OnInit {
           this.busy.set(false);
           this.confirmDisconnect.set(false);
           this.feedUrl = '';
+          this.showFeedUrl.set(false);
           this.editing.set(false);
           this.message.set(
             'Canvas disconnected. Your personal plans are unchanged.',

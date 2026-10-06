@@ -1,9 +1,10 @@
 <section class="page prio-page">
   <header class="page__header">
     <div>
-      <p class="prio-kicker">Account</p>
       <h1 class="prio-title">Settings</h1>
-      <p class="prio-lede">Manage your profile and notification preferences.</p>
+      <p class="prio-lede">
+        Your account, connected calendar, and notifications.
+      </p>
     </div>
     <a mat-stroked-button routerLink="/reminders">
       <mat-icon>notifications</mat-icon>
@@ -11,157 +12,220 @@
     </a>
   </header>
 
-  <app-canvas-connection />
   @if (error(); as message) {
     <p class="crud__banner" role="alert">{{ message }}</p>
   }
 
-  @if (loading()) {
-    <p class="crud__note"><mat-icon>hourglass_top</mat-icon> Loading settings…</p>
-  } @else {
-    @if (auth.currentUser(); as user) {
-      <section class="settings__block prio-panel">
-        <h2 class="settings__heading">Profile</h2>
-        <p class="settings__lede">Your account information.</p>
-
-        <dl class="settings__profile">
-          <div>
-            <dt>Name</dt>
-            <dd>{{ user.firstName }} {{ user.lastName }}</dd>
-          </div>
-          <div>
-            <dt>Email</dt>
-            <dd>{{ user.email }}</dd>
-          </div>
-          <div>
-            <dt>Sign-in method</dt>
-            <dd>{{ user.authProvider === 'GOOGLE' ? 'Google' : 'Email and password' }}</dd>
-          </div>
-        </dl>
-      </section>
-    }
-
-    <section class="settings__block prio-panel">
-      <h2 class="settings__heading">Notifications</h2>
-      <p class="settings__lede">Choose how Prioritize can reach you.</p>
-
-      <form class="settings__form" [formGroup]="settingsForm" (ngSubmit)="saveSettings()">
-        <label class="settings__toggle">
-          <input type="checkbox" formControlName="emailEnabled" />
-          <span>
-            <strong>Email</strong>
-            <small>Send reminders to your account email</small>
-          </span>
-        </label>
-        <div class="settings__actions">
-          <button mat-flat-button color="primary" type="submit" [disabled]="savingSettings()">
-            <mat-icon>save</mat-icon>
-            {{ savingSettings() ? 'Saving…' : 'Save email preference' }}
-          </button>
-          @if (settingsSaved()) {
-            <span class="settings__saved"><mat-icon>check_circle</mat-icon> Saved</span>
-          }
-        </div>
-      </form>
-    </section>
-
-    <section class="settings__block prio-panel settings__sms-card">
-      <h2 class="settings__heading">SMS Reminders</h2>
-
-      @if (smsEnabled()) {
-        <div class="settings__sms-enabled">
-          <p class="settings__sms-status">
-            <mat-icon>check_circle</mat-icon>
-            SMS reminders are enabled
-            @if (smsOptInForm.controls.phoneNumber.value) {
-              for <strong>{{ smsOptInForm.controls.phoneNumber.value }}</strong>
-            }
-            @if (phoneVerified()) {
-              <span class="settings__badge settings__badge--ok">
-                <mat-icon>verified</mat-icon>
-                Verified
-              </span>
-            } @else {
-              <span class="settings__badge">
-                <mat-icon>pending</mat-icon>
-                Pending verification
-              </span>
-            }
+  <div class="settings__layout">
+    <div class="settings__account">
+      @if (loading()) {
+        <div class="settings__block prio-panel" role="status" aria-busy="true">
+          <p class="crud__note">
+            <mat-icon>hourglass_top</mat-icon> Loading settings…
           </p>
-
-          @if (!phoneVerified()) {
-            <div class="settings__verify">
-              <p class="settings__verify-lede">
-                Enter the 6-digit code we sent to your phone.
-              </p>
-              <div class="settings__verify-row">
-                <button mat-stroked-button type="button" (click)="sendCode()" [disabled]="sendingCode()">
-                  <mat-icon>sms</mat-icon>
-                  {{ sendingCode() ? 'Sending…' : 'Resend code' }}
-                </button>
-                @if (codeSent()) {
-                  <span class="settings__saved"><mat-icon>check_circle</mat-icon> Code sent</span>
-                }
-              </div>
-              <form class="settings__verify-form" [formGroup]="verifyForm" (ngSubmit)="verifyCode()">
-                <label class="crud__field">
-                  <span>Verification code</span>
-                  <input type="text" formControlName="code" inputmode="numeric" maxlength="6" placeholder="123456" />
-                </label>
-                <button mat-flat-button color="primary" type="submit" [disabled]="verifyingCode()">
-                  <mat-icon>verified_user</mat-icon>
-                  {{ verifyingCode() ? 'Verifying…' : 'Verify' }}
-                </button>
-              </form>
-            </div>
-          }
-
-          <button
-            mat-stroked-button
-            type="button"
-            class="settings__disable-sms"
-            (click)="disableSmsReminders()"
-            [disabled]="disablingSms()"
-          >
-            Disable SMS reminders
-          </button>
+          <div class="settings__skeleton" aria-hidden="true"></div>
         </div>
       } @else {
-        <form class="settings__sms-optin" [formGroup]="smsOptInForm" (ngSubmit)="enableSmsReminders()">
-          <label class="crud__field">
-            <span>Phone number</span>
-            <input
-              type="tel"
-              formControlName="phoneNumber"
-              placeholder="(901) 555-1234"
-              autocomplete="tel"
-            />
-          </label>
+        @if (auth.currentUser(); as user) {
+          <section class="settings__block prio-panel">
+            <h2 class="settings__heading">Profile</h2>
+            <p class="settings__lede">Your account information.</p>
 
-          <label class="settings__consent">
-            <input type="checkbox" formControlName="consent" />
-            <span class="settings__consent-copy">
-              I agree to receive SMS task and deadline reminders from Prioritize. Message frequency varies.
-              Message and data rates may apply. Reply STOP to opt out or HELP for help.
-            </span>
-          </label>
+            <dl class="settings__profile">
+              <div>
+                <dt>Name</dt>
+                <dd>{{ user.firstName }} {{ user.lastName }}</dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd>{{ user.email }}</dd>
+              </div>
+              <div>
+                <dt>Sign-in method</dt>
+                <dd>
+                  {{
+                    user.authProvider === "GOOGLE"
+                      ? "Google"
+                      : "Email and password"
+                  }}
+                </dd>
+              </div>
+            </dl>
+          </section>
+        }
 
-          <p class="settings__legal">
-            <a href="/privacy">Privacy Policy</a>
-            <span aria-hidden="true">|</span>
-            <a href="/terms">Terms &amp; Conditions</a>
-          </p>
+        <section class="settings__block prio-panel">
+          <h2 class="settings__heading">Notifications</h2>
+          <p class="settings__lede">Choose how Prioritize can reach you.</p>
 
-          <button
-            mat-stroked-button
-            type="submit"
-            class="settings__enable-sms"
-            [disabled]="!canEnableSms"
+          <form
+            class="settings__form"
+            [formGroup]="settingsForm"
+            (ngSubmit)="saveSettings()"
           >
-            {{ enablingSms() ? 'Enabling…' : 'Enable SMS Reminders' }}
-          </button>
-        </form>
+            <label class="settings__toggle">
+              <span class="settings__email-icon" aria-hidden="true"
+                ><mat-icon>mail_outline</mat-icon></span
+              >
+              <span class="settings__toggle-copy">
+                <strong>Email</strong>
+                <small>Send reminders to your account email</small>
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="Email reminders"
+                formControlName="emailEnabled"
+              />
+            </label>
+            <div class="settings__actions">
+              <button
+                mat-flat-button
+                color="primary"
+                type="submit"
+                [disabled]="savingSettings()"
+              >
+                <mat-icon>save</mat-icon>
+                {{ savingSettings() ? "Saving…" : "Save email preference" }}
+              </button>
+              @if (settingsSaved()) {
+                <span class="settings__saved" role="status"
+                  ><mat-icon>check_circle</mat-icon> Saved</span
+                >
+              }
+            </div>
+          </form>
+        </section>
+
+        <section class="settings__block prio-panel settings__sms-card">
+          <h2 class="settings__heading">SMS Reminders</h2>
+
+          @if (smsEnabled()) {
+            <div class="settings__sms-enabled">
+              <p class="settings__sms-status">
+                <mat-icon>check_circle</mat-icon>
+                SMS reminders are enabled
+                @if (smsOptInForm.controls.phoneNumber.value) {
+                  for
+                  <strong>{{ smsOptInForm.controls.phoneNumber.value }}</strong>
+                }
+                @if (phoneVerified()) {
+                  <span class="settings__badge settings__badge--ok">
+                    <mat-icon>verified</mat-icon>
+                    Verified
+                  </span>
+                } @else {
+                  <span class="settings__badge">
+                    <mat-icon>pending</mat-icon>
+                    Pending verification
+                  </span>
+                }
+              </p>
+
+              @if (!phoneVerified()) {
+                <div class="settings__verify">
+                  <p class="settings__verify-lede">
+                    Enter the 6-digit code we sent to your phone.
+                  </p>
+                  <div class="settings__verify-row">
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      (click)="sendCode()"
+                      [disabled]="sendingCode()"
+                    >
+                      <mat-icon>sms</mat-icon>
+                      {{ sendingCode() ? "Sending…" : "Resend code" }}
+                    </button>
+                    @if (codeSent()) {
+                      <span class="settings__saved" role="status"
+                        ><mat-icon>check_circle</mat-icon> Code sent</span
+                      >
+                    }
+                  </div>
+                  <form
+                    class="settings__verify-form"
+                    [formGroup]="verifyForm"
+                    (ngSubmit)="verifyCode()"
+                  >
+                    <label class="crud__field">
+                      <span>Verification code</span>
+                      <input
+                        type="text"
+                        formControlName="code"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        maxlength="6"
+                        placeholder="123456"
+                      />
+                    </label>
+                    <button
+                      mat-flat-button
+                      color="primary"
+                      type="submit"
+                      [disabled]="verifyingCode()"
+                    >
+                      <mat-icon>verified_user</mat-icon>
+                      {{ verifyingCode() ? "Verifying…" : "Verify" }}
+                    </button>
+                  </form>
+                </div>
+              }
+
+              <button
+                mat-stroked-button
+                type="button"
+                class="settings__disable-sms"
+                (click)="disableSmsReminders()"
+                [disabled]="disablingSms()"
+              >
+                Disable SMS reminders
+              </button>
+            </div>
+          } @else {
+            <form
+              class="settings__sms-optin"
+              [formGroup]="smsOptInForm"
+              (ngSubmit)="enableSmsReminders()"
+            >
+              <label class="crud__field">
+                <span>Phone number</span>
+                <input
+                  type="tel"
+                  formControlName="phoneNumber"
+                  placeholder="(901) 555-1234"
+                  autocomplete="tel"
+                />
+              </label>
+
+              <label class="settings__consent">
+                <input type="checkbox" formControlName="consent" />
+                <span class="settings__consent-copy">
+                  I agree to receive SMS task and deadline reminders from
+                  Prioritize. Message frequency varies. Message and data rates
+                  may apply. Reply STOP to opt out or HELP for help.
+                </span>
+              </label>
+
+              <p class="settings__legal">
+                <a href="/privacy">Privacy Policy</a>
+                <span aria-hidden="true">|</span>
+                <a href="/terms">Terms &amp; Conditions</a>
+              </p>
+
+              <button
+                mat-stroked-button
+                type="submit"
+                class="settings__enable-sms"
+                [disabled]="!canEnableSms"
+              >
+                {{ enablingSms() ? "Enabling…" : "Enable SMS Reminders" }}
+              </button>
+            </form>
+          }
+        </section>
       }
-    </section>
-  }
+    </div>
+    <app-canvas-connection />
+  </div>
 </section>

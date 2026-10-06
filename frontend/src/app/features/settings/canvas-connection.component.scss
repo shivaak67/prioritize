@@ -1,121 +1,282 @@
 :host {
   display: block;
-  margin: 1.4rem 0;
+  height: 100%;
 }
 .canvas-card {
-  padding: clamp(20px, 3vw, 32px);
-}
-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+  padding: 1.25rem;
+  min-height: 100%;
 }
 h2 {
-  margin: 3px 0;
+  margin: 0 0 0.95rem;
   font-size: 1.5rem;
+}
+.canvas-provider {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem;
+  border: 1px solid var(--prio-line);
+  border-radius: 12px;
+}
+.canvas-provider__copy {
+  flex: 1;
+  min-width: 0;
+}
+.canvas-provider h3 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+.canvas-provider p {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--prio-ink-soft);
 }
 .canvas-mark {
   display: grid;
   place-items: center;
-  flex: 0 0 44px;
-  height: 44px;
-  border-radius: 14px;
+  flex: 0 0 3.2rem;
+  height: 3.2rem;
+  border-radius: 12px;
   background: #fff0ed;
-  color: #ad3f31;
-  font-weight: 800;
-  font-size: 25px;
+  color: #c44435;
 }
-p,
-li {
-  line-height: 1.65;
+.canvas-mark mat-icon {
+  width: 2rem;
+  height: 2rem;
+  font-size: 2rem;
 }
-ol {
-  padding-left: 22px;
+.canvas-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 0.45rem 0.65rem;
+  border-radius: 99px;
+  background: #fff0ed;
+  color: #aa3029;
+  font-size: 0.72rem;
+  font-weight: 600;
 }
-.muted {
-  color: var(--prio-ink-soft, #586b66);
-  font-size: 0.88rem;
+.canvas-badge::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+.canvas-badge--connected {
+  background: var(--prio-mint);
+  color: var(--prio-teal-deep);
+}
+p {
+  line-height: 1.55;
+}
+.canvas-intro {
+  margin: 0.85rem 0 1rem;
+  font-size: 0.87rem;
+  color: var(--prio-ink-soft);
+}
+.canvas-steps {
+  list-style: none;
+  padding: 1rem 0 0;
+  margin: 0 0 1.3rem;
+  border-top: 1px solid var(--prio-line);
+  counter-reset: step;
+  display: grid;
+  gap: 1rem;
+}
+.canvas-steps li {
+  position: relative;
+  padding-left: 3rem;
+  counter-increment: step;
+}
+.canvas-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: #e6f2f0;
+  color: var(--prio-teal-deep);
+  font-weight: 700;
+}
+.canvas-steps strong {
+  display: block;
+  font-size: 0.86rem;
+  margin-bottom: 0.2rem;
+}
+.canvas-steps span {
+  display: block;
+  color: var(--prio-ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.muted,
+.canvas-details {
+  color: var(--prio-ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.6;
 }
 .connection-status {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 24px;
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem;
   background: #edf5ef;
   border-radius: 12px;
-  padding: 16px;
   overflow-wrap: anywhere;
+  font-size: 0.87rem;
 }
 .canvas-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 0.7rem;
 }
 button {
-  border: 1px solid #244f42;
-  background: #244f42;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 42px;
+  border: 1px solid var(--prio-teal);
+  background: var(--prio-teal);
   color: white;
-  padding: 11px 16px;
-  border-radius: 9px;
+  padding: 0.65rem 1.1rem;
+  border-radius: 99px;
   font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
 }
 button.secondary {
   background: transparent;
-  color: #244f42;
+  color: var(--prio-teal-deep);
 }
 button:disabled {
   opacity: 0.55;
   cursor: wait;
 }
 a {
-  color: #244f42;
+  color: var(--prio-teal-deep);
+  font-size: 0.85rem;
+  text-underline-offset: 3px;
 }
 fieldset {
+  min-width: 0;
+  margin: 0;
   border: 0;
   padding: 0;
   display: grid;
-  gap: 16px;
-  max-width: 700px;
+  gap: 1rem;
 }
-label {
+label,
+.feed-field {
   display: grid;
-  gap: 7px;
+  gap: 0.4rem;
+  font-size: 0.84rem;
   font-weight: 600;
 }
 input {
   min-width: 0;
   width: 100%;
-  box-sizing: border-box;
-  padding: 13px;
-  border: 1px solid #acbdb5;
-  border-radius: 9px;
+  padding: 0.75rem;
+  border: 1px solid #d0dadd;
+  border-radius: 10px;
   font: inherit;
-  background: white;
+  color: var(--prio-ink);
+  background: #ffffffb8;
+}
+.feed-input {
+  display: flex;
+  position: relative;
+}
+.feed-input input {
+  padding-right: 3rem;
+}
+.feed-reveal {
+  position: absolute;
+  right: 0.2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.7rem;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--prio-ink-soft);
+  border-radius: 8px;
+}
+.feed-reveal mat-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  font-size: 1.15rem;
 }
 small {
   font-weight: 400;
-  color: #586b66;
+  color: var(--prio-ink-soft);
+  font-size: 0.74rem;
 }
-fieldset button {
+fieldset > button {
   justify-self: start;
+  margin-top: 0.15rem;
+}
+.canvas-footnote {
+  margin-top: 1.2rem;
+}
+.canvas-details {
+  border-top: 1px solid var(--prio-line);
+  padding-top: 0.8rem;
+}
+summary {
+  cursor: pointer;
+  color: var(--prio-teal-deep);
+  font-weight: 600;
+  padding-block: 0.25rem;
 }
 .canvas-error {
-  padding: 12px;
-  border-radius: 9px;
+  padding: 0.8rem;
+  border-radius: 10px;
   background: #fff1ef;
-  color: #8c302b;
+  color: var(--prio-danger);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
 }
 .canvas-success {
-  color: #24503d;
+  padding: 0.8rem;
+  border-radius: 10px;
+  background: var(--prio-mint);
+  color: var(--prio-teal-deep);
+  font-size: 0.85rem;
 }
 .disconnect {
-  border: 1px solid #c9d5cc;
-  padding: 16px;
-  margin-top: 16px;
+  border: 1px solid #e2b5ae;
+  padding: 1rem;
+  margin-top: 1rem;
   border-radius: 12px;
+  font-size: 0.85rem;
 }
-:is(a, button, input):focus-visible {
-  outline: 3px solid #bc6a2a;
+.disconnect button {
+  margin: 0.25rem 0.25rem 0.25rem 0;
+}
+:is(a, button, input, summary):focus-visible {
+  outline: 3px solid var(--prio-teal);
   outline-offset: 3px;
+}
+@media (max-width: 620px) {
+  .canvas-card {
+    padding: 1rem;
+  }
+  .canvas-provider {
+    flex-wrap: wrap;
+  }
+  .canvas-badge {
+    margin-left: 4rem;
+  }
+  .canvas-provider__copy {
+    flex-basis: calc(100% - 4.1rem);
+  }
 }

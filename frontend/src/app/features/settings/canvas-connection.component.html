@@ -1,14 +1,32 @@
 <section class="canvas-card prio-panel" aria-labelledby="canvas-heading">
-  <header>
-    <span class="canvas-mark" aria-hidden="true">C</span>
-    <div>
-      <p class="prio-kicker">Connected calendars</p>
-      <h2 id="canvas-heading">Bring Canvas into your day</h2>
+  <h2 id="canvas-heading">Connected calendars</h2>
+  <header class="canvas-provider">
+    <span class="canvas-mark" aria-hidden="true"
+      ><mat-icon>school</mat-icon></span
+    >
+    <div class="canvas-provider__copy">
+      <h3>Canvas</h3>
+      <p>Bring your coursework into Prioritize.</p>
     </div>
+    <span
+      class="canvas-badge"
+      [class.canvas-badge--connected]="status()?.connected"
+      role="status"
+    >
+      {{
+        loading()
+          ? "Checking…"
+          : status()?.connected
+            ? "Connected"
+            : status()
+              ? "Not connected"
+              : "Unavailable"
+      }}
+    </span>
   </header>
-  <p>
-    See assignment deadlines and course events alongside your own plans. No
-    developer key or Canvas password needed.
+  <p class="canvas-intro">
+    Import your Canvas assignments and course events with your private calendar
+    feed. No developer key or Canvas password needed.
   </p>
   @if (loading()) {
     <p role="status">Checking your connection…</p>
@@ -79,28 +97,57 @@
       }
     }
     @if (!connection.connected || editing()) {
-      <ol>
-        <li>Open Canvas and select <strong>Calendar</strong>.</li>
-        <li>Select <strong>Calendar Feed</strong> in the calendar sidebar and copy the link. On a narrow screen, look below the calendar.</li>
-        <li>Paste it below, check your timezone, and select <strong>Connect Canvas</strong>.</li>
+      <ol class="canvas-steps">
+        <li>
+          <strong>Open Canvas Calendar</strong
+          ><span>In Canvas, go to Calendar.</span>
+        </li>
+        <li>
+          <strong>Copy Calendar Feed link</strong
+          ><span
+            >Select <b>Calendar Feed</b> in the calendar sidebar and copy the
+            link. On a narrow screen, look below the calendar.</span
+          >
+        </li>
+        <li>
+          <strong>Paste below</strong
+          ><span>Paste your link, choose your timezone, and connect.</span>
+        </li>
       </ol>
-      <p>After connecting, use <strong>View calendar</strong> to see your deadlines, or open <strong>Tasks → Canvas assignments</strong>. You can set reminders for several assignments at once in Reminders.</p>
       <form (ngSubmit)="connect()">
         <fieldset [disabled]="busy()">
-          <label
-            >Canvas calendar feed link<input
-              type="password"
-              name="canvasFeedUrl"
-              [(ngModel)]="feedUrl"
-              autocomplete="off"
-              spellcheck="false"
-              required
-              maxlength="2048"
-              placeholder="Paste your private Calendar Feed link"
-          /></label>
+          <div class="feed-field">
+            <label for="canvas-feed-url">Private calendar feed link</label>
+            <div class="feed-input">
+              <input
+                id="canvas-feed-url"
+                [type]="showFeedUrl() ? 'text' : 'password'"
+                name="canvasFeedUrl"
+                [(ngModel)]="feedUrl"
+                autocomplete="off"
+                spellcheck="false"
+                required
+                maxlength="2048"
+                placeholder="Paste your private Calendar Feed link"
+              /><button
+                class="feed-reveal"
+                type="button"
+                (click)="showFeedUrl.set(!showFeedUrl())"
+                [attr.aria-label]="
+                  showFeedUrl() ? 'Hide feed link' : 'Show feed link'
+                "
+                [attr.aria-pressed]="showFeedUrl()"
+              >
+                <mat-icon>{{
+                  showFeedUrl() ? "visibility_off" : "visibility"
+                }}</mat-icon>
+              </button>
+            </div>
+          </div>
           <label
             >Calendar timezone<input
               name="canvasTimezone"
+              list="calendar-timezones"
               [(ngModel)]="timezone"
               required
               maxlength="64"
@@ -109,7 +156,15 @@
               >Used for calendar entries that do not specify a timezone.</small
             ></label
           >
+          <datalist id="calendar-timezones">
+            <option value="America/Chicago"></option>
+            <option value="America/New_York"></option>
+            <option value="America/Denver"></option>
+            <option value="America/Los_Angeles"></option>
+            <option value="UTC"></option>
+          </datalist>
           <button type="submit">
+            <mat-icon aria-hidden="true">link</mat-icon>
             {{
               busy()
                 ? "Importing your calendar…"
@@ -120,18 +175,29 @@
           </button>
         </fieldset>
       </form>
-      <p class="muted">
-        Your feed link is private. It is encrypted on the server and hidden
-        after connection. Currently supports Canvas sites at *.instructure.com.
-      </p>
     }
-    <p class="muted">
-      Canvas → Prioritize only. Imported items are read-only; update them in
-      Canvas. The feed includes dated assignments and events, not grades,
-      submissions, or undated to-do items. Canvas usually includes the last 30
-      days and next 366 days; items no longer in the feed are removed from this
-      calendar.
+    <p class="muted canvas-footnote">
+      Imports dated assignments and events. Changes in Canvas sync one way to
+      Prioritize.
     </p>
+    <details class="canvas-details">
+      <summary>About your connection and privacy</summary>
+      <p>
+        Your private feed link is encrypted on the server and hidden after
+        connection. Supports Canvas sites at *.instructure.com.
+      </p>
+      <p>
+        Imported items are read-only; update them in Canvas. The feed does not
+        include grades, submissions, or undated to-do items. Canvas usually
+        includes the last 30 days and next 366 days; items no longer in the feed
+        are removed from this calendar.
+      </p>
+      <p>
+        After connecting, open Calendar or Tasks → Canvas assignments to see
+        your deadlines. Schedule alerts for several assignments together in
+        Reminders.
+      </p>
+    </details>
   }
   @if (message()) {
     <p role="status" class="canvas-success">{{ message() }}</p>
