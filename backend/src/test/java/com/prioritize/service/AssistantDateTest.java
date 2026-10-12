@@ -70,6 +70,38 @@ class AssistantDateTest {
     }
 
     @Test
+    void explicitWeekdayInUserRequestOverridesIncorrectModelDate() {
+        var executor = new AssistantToolExecutor(new ObjectMapper(), tasks, events, clock);
+        UUID taskId = UUID.randomUUID();
+        var algorithmsTest = new TaskResponse(taskId, null, null, "Algorithms test", null,
+                LocalDate.of(2026, 9, 8), null, null, 0, com.prioritize.model.TaskPriority.HIGH,
+                com.prioritize.model.TaskStatus.TODO, null, null, null);
+        when(tasks.list(userId, null, null, null)).thenReturn(List.of(algorithmsTest));
+        when(tasks.update(eq(userId), eq(taskId), any())).thenReturn(algorithmsTest);
+
+        executor.execute(userId, "update_task",
+                "{\"taskTitle\":\"Algorithms test\",\"dueDate\":\"2026-09-08\"}",
+                ZoneId.of("America/Chicago"),
+                "change the algorithms test date to Thursday");
+
+        ArgumentCaptor<TaskRequest> request = ArgumentCaptor.forClass(TaskRequest.class);
+        verify(tasks).update(eq(userId), eq(taskId), request.capture());
+        assertThat(request.getValue().dueDate()).isEqualTo(LocalDate.of(2026, 9, 10));
+    }
+
+    @Test
+    void toolResolvesWeekdayNamesWithoutModelDateMath() {
+        var executor = new AssistantToolExecutor(new ObjectMapper(), tasks, events, clock);
+        executor.execute(userId, "create_task",
+                "{\"title\":\"Algorithms test\",\"dueDate\":\"Thursday\"}",
+                ZoneId.of("America/Chicago"));
+
+        ArgumentCaptor<TaskRequest> request = ArgumentCaptor.forClass(TaskRequest.class);
+        verify(tasks).create(eq(userId), request.capture());
+        assertThat(request.getValue().dueDate()).isEqualTo(LocalDate.of(2026, 9, 10));
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void calendarContextKeepsLocalDatesAcrossMidnightAndChecksAllLists() {
         properties.setEnabled(true); properties.setApiKey("test");

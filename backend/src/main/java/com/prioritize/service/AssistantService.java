@@ -62,7 +62,10 @@ public class AssistantService {
             Be concise, practical, and friendly. Prefer short paragraphs or bullet lists when listing items.
             The current date and timezone in USER DATA are authoritative for this request.
             Use them for today, tomorrow, and relative dates, even if earlier chat messages give a different date.
-            For tool calls: use dueDate as YYYY-MM-DD (or 'today' / 'tomorrow'), dueTime as HH:MM or h:mm AM/PM,
+            When the user gives a weekday without an exact calendar date, pass that weekday word unchanged
+            in dueDate; the server resolves it in the user's timezone. Do not calculate the date yourself.
+            For tool calls: use dueDate as YYYY-MM-DD, 'today', 'tomorrow', or a weekday name;
+            use dueTime as HH:MM or h:mm AM/PM,
             and calendar startAt/endAt as ISO-8601 datetimes in the user's local timezone.
             When mentioning times to the user, always use 12-hour clock with AM/PM (for example, 3:30 PM).
             Never use 24-hour or military time in replies.
@@ -117,11 +120,12 @@ public class AssistantService {
         messages.add(Map.of("role", "user", "content", request.message()));
 
         List<Map<String, Object>> tools = AssistantToolExecutor.toolDefinitions();
-        String reply = runWithTools(userId, messages, tools, zone);
+        String reply = runWithTools(userId, messages, tools, zone, request.message());
         return new AssistantChatResponse(reply, true);
     }
 
-    private String runWithTools(UUID userId, List<Map<String, Object>> messages, List<Map<String, Object>> tools, ZoneId zone) {
+    private String runWithTools(UUID userId, List<Map<String, Object>> messages,
+            List<Map<String, Object>> tools, ZoneId zone, String userMessage) {
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
             LlmCompletion completion = llmClient.complete(messages, tools);
 
@@ -132,7 +136,7 @@ public class AssistantService {
             messages.add(buildAssistantToolMessage(completion));
 
             for (LlmToolCall call : completion.toolCalls()) {
-                String result = toolExecutor.execute(userId, call.name(), call.arguments(), zone);
+                String result = toolExecutor.execute(userId, call.name(), call.arguments(), zone, userMessage);
                 messages.add(Map.of(
                         "role", "tool",
                         "tool_call_id", call.id(),

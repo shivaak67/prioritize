@@ -1,6 +1,7 @@
 package com.prioritize.service;
 
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -8,12 +9,15 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
 
@@ -33,6 +37,9 @@ public class AssistantToolExecutor {
 
     private static final DateTimeFormatter TIME_12H =
             DateTimeFormatter.ofPattern("h:mm a", Locale.US);
+    private static final Pattern WEEKDAY_PATTERN = Pattern.compile(
+            "\\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b",
+            Pattern.CASE_INSENSITIVE);
 
     private final ObjectMapper objectMapper;
     private final TaskService taskService;
@@ -57,7 +64,7 @@ public class AssistantToolExecutor {
                 "Create a new task for the user.",
                 Map.of(
                         "title", stringProp("Task title"),
-                        "dueDate", stringProp("Due date as YYYY-MM-DD, or 'today' or 'tomorrow'"),
+                        "dueDate", stringProp("Due date as YYYY-MM-DD, 'today', 'tomorrow', or a weekday name"),
                         "dueTime", stringProp("Due time as HH:MM (24h) or h:mm AM/PM"),
                         "priority", enumProp("Task priority", "LOW", "MEDIUM", "HIGH", "URGENT"),
                         "status", enumProp("Task status", "TODO", "IN_PROGRESS", "COMPLETED", "CANCELLED"),
@@ -70,7 +77,7 @@ public class AssistantToolExecutor {
                         "taskId", stringProp("Task UUID"),
                         "taskTitle", stringProp("Exact or partial task title if taskId is unknown"),
                         "title", stringProp("New title"),
-                        "dueDate", stringProp("Due date as YYYY-MM-DD, or 'today' or 'tomorrow'"),
+                        "dueDate", stringProp("Due date as YYYY-MM-DD, 'today', 'tomorrow', or a weekday name"),
                         "dueTime", stringProp("Due time as HH:MM (24h) or h:mm AM/PM, or empty to clear"),
                         "priority", enumProp("Task priority", "LOW", "MEDIUM", "HIGH", "URGENT"),
                         "status", enumProp("Task status", "TODO", "IN_PROGRESS", "COMPLETED", "CANCELLED"),
@@ -121,8 +128,13 @@ public class AssistantToolExecutor {
     }
 
     public String execute(UUID userId, String toolName, String argumentsJson, ZoneId zone) {
+        return execute(userId, toolName, argumentsJson, zone, null);
+    }
+
+    public String execute(UUID userId, String toolName, String argumentsJson, ZoneId zone, String userMessage) {
         try {
             JsonNode args = objectMapper.readTree(argumentsJson == null ? "{}" : argumentsJson);
+            applyRequestedWeekday(args, toolName, userMessage, zone);
             return switch (toolName) {
                 case "create_task" -> createTask(userId, args, zone);
                 case "update_task" -> updateTask(userId, args, zone);
@@ -136,6 +148,26 @@ public class AssistantToolExecutor {
         } catch (Exception ex) {
             return error(ex.getMessage() == null ? "Tool execution failed" : ex.getMessage());
         }
+    }
+
+    private void applyRequestedWeekday(JsonNode args, String toolName, String userMessage, ZoneId zone) {
+        if (!(args instanceof ObjectNode objectArgs)
+                || !("create_task".equals(toolName) || "update_task".equals(toolName))
+                || userMessage == null) {
+            return;
+        }
+
+        Matcher matcher = WEEKDAY_PATTERN.matcher(userMessage);
+        DayOfWeek requestedDay = null;
+        while (matcher.find()) {
+            requestedDay = DayOfWeek.valueOf(matcher.group(1).toUpperCase(Locale.US));
+        }
+        if (requestedDay == null) {
+            return;
+        }
+
+        LocalDate today = LocalDate.now(clock.withZone(zone));
+        objectArgs.put("dueDate", today.with(TemporalAdjusters.nextOrSame(requestedDay)).toString());
     }
 
     private String createTask(UUID userId, JsonNode args, ZoneId zone) {
@@ -331,6 +363,12 @@ public class AssistantToolExecutor {
         }
         if ("tomorrow".equals(lower)) {
             return today.plusDays(1);
+        }
+        try {
+            DayOfWeek weekday = DayOfWeek.valueOf(lower.toUpperCase(Locale.US));
+            return today.with(TemporalAdjusters.nextOrSame(weekday));
+        } catch (IllegalArgumentException ignored) {
+            // Not a weekday; parse it as an ISO calendar date below.
         }
         return LocalDate.parse(value);
     }
