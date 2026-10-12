@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import jakarta.servlet.http.Cookie;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,7 +47,7 @@ class AuthControllerIntegrationTest {
                         .content(registerBody))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.expiresIn").value(86400000))
+                .andExpect(jsonPath("$.expiresIn").value(900000))
                 .andExpect(jsonPath("$.user.email").value("grace@example.com"))
                 .andExpect(jsonPath("$.user.authProvider").value("LOCAL"))
                 .andExpect(jsonPath("$.user.role").value("USER"))
@@ -85,6 +86,47 @@ class AuthControllerIntegrationTest {
         mockMvc.perform(post("/api/auth/logout")
                         .header("Authorization", "Bearer " + loginToken))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void refreshCookieRotatesAndLogoutRevokesSession() throws Exception {
+        String registerBody = """
+                {
+                  "firstName": "Remembered",
+                  "lastName": "User",
+                  "email": "remembered@example.com",
+                  "password": "password1",
+                  "passwordConfirmation": "password1"
+                }
+                """;
+
+        MvcResult register = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Cookie firstCookie = register.getResponse().getCookie("prioritize_refresh");
+        assertThat(firstCookie).isNotNull();
+        assertThat(firstCookie.isHttpOnly()).isTrue();
+
+        MvcResult refreshed = mockMvc.perform(post("/api/auth/refresh").cookie(firstCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andReturn();
+        Cookie rotatedCookie = refreshed.getResponse().getCookie("prioritize_refresh");
+        assertThat(rotatedCookie).isNotNull();
+        assertThat(rotatedCookie.getValue()).isNotEqualTo(firstCookie.getValue());
+
+        mockMvc.perform(post("/api/auth/refresh").cookie(firstCookie))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/auth/logout").cookie(rotatedCookie))
+                .andExpect(status().isNoContent())
+                .andExpect(result -> assertThat(result.getResponse()
+                        .getCookie("prioritize_refresh").getMaxAge()).isZero());
+
+        mockMvc.perform(post("/api/auth/refresh").cookie(rotatedCookie))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

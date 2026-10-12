@@ -26,7 +26,10 @@ app:
     origins: http://localhost:4200
   jwt:
     secret: test-jwt-secret-key-at-least-32-chars-long
-    expiration-ms: 86400000
+    expiration-ms: 900000
+  refresh-token:
+    expiration-days: 30
+    cookie-secure: false
   oauth:
     google:
       enabled: false

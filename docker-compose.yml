@@ -33,7 +33,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-prioritize}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-to-a-long-random-secret}
-      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-900000}
       APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-http://localhost:4200}
       GOOGLE_OAUTH_ENABLED: ${GOOGLE_OAUTH_ENABLED:-false}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}

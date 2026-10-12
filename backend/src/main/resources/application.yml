@@ -46,7 +46,10 @@ app:
     origins: ${APP_CORS_ORIGINS:http://localhost:4200}
   jwt:
     secret: ${JWT_SECRET:dev-only-change-me-to-a-long-random-secret}
-    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    expiration-ms: ${JWT_EXPIRATION_MS:900000}
+  refresh-token:
+    expiration-days: ${REFRESH_TOKEN_EXPIRATION_DAYS:30}
+    cookie-secure: ${REFRESH_TOKEN_COOKIE_SECURE:false}
   oauth:
     success-redirect: ${APP_OAUTH_SUCCESS_REDIRECT:http://localhost:4200/auth/callback}
     google:

@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, tap } from 'rxjs';
+import { Observable, finalize, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   AuthConfig,
@@ -17,6 +17,7 @@ const USER_KEY = 'prioritize_user';
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly api = `${environment.apiBaseUrl}/api/auth`;
+  private refreshRequest$: Observable<AuthResponse> | null = null;
 
   readonly currentUser = signal<UserDto | null>(this.readStoredUser());
 
@@ -38,6 +39,23 @@ export class AuthService {
     return this.http
       .post<AuthResponse>(`${this.api}/register`, body)
       .pipe(tap((res) => this.persist(res.accessToken, res.user)));
+  }
+
+  refreshSession(): Observable<AuthResponse> {
+    if (!this.refreshRequest$) {
+      this.refreshRequest$ = this.http
+        .post<AuthResponse>(
+          `${this.api}/refresh`,
+          {},
+          { withCredentials: true },
+        )
+        .pipe(
+          tap((res) => this.persist(res.accessToken, res.user)),
+          finalize(() => (this.refreshRequest$ = null)),
+          shareReplay({ bufferSize: 1, refCount: false }),
+        );
+    }
+    return this.refreshRequest$;
   }
 
   getConfig(): Observable<AuthConfig> {
@@ -77,7 +95,10 @@ export class AuthService {
         return null;
       }
       const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
-      const payload = JSON.parse(atob(normalized)) as { sub?: string; email?: string };
+      const payload = JSON.parse(atob(normalized)) as {
+        sub?: string;
+        email?: string;
+      };
       if (!payload.sub || !payload.email) {
         return null;
       }
@@ -96,6 +117,13 @@ export class AuthService {
   }
 
   logout(): void {
+    this.http
+      .post<void>(`${this.api}/logout`, {}, { withCredentials: true })
+      .subscribe({ error: () => undefined });
+    this.clearSession();
+  }
+
+  clearSession(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     this.currentUser.set(null);

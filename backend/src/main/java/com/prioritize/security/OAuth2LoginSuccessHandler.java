@@ -2,19 +2,17 @@ package com.prioritize.security;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import com.prioritize.config.OAuthProperties;
 import com.prioritize.dto.AuthResponse;
-import com.prioritize.dto.UserResponse;
 import com.prioritize.service.GoogleAuthService;
+import com.prioritize.service.RefreshTokenService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,10 +23,15 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private final GoogleAuthService googleAuthService;
     private final OAuthProperties oauthProperties;
+    private final RefreshTokenService refreshTokenService;
+    private final RefreshTokenCookieService refreshTokenCookieService;
 
-    public OAuth2LoginSuccessHandler(GoogleAuthService googleAuthService, OAuthProperties oauthProperties) {
+    public OAuth2LoginSuccessHandler(GoogleAuthService googleAuthService, OAuthProperties oauthProperties,
+            RefreshTokenService refreshTokenService, RefreshTokenCookieService refreshTokenCookieService) {
         this.googleAuthService = googleAuthService;
         this.oauthProperties = oauthProperties;
+        this.refreshTokenService = refreshTokenService;
+        this.refreshTokenCookieService = refreshTokenCookieService;
     }
 
     @Override
@@ -42,23 +45,13 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         }
 
         AuthResponse auth = googleAuthService.loginOrRegister(oidcUser);
-        UserResponse user = auth.user();
+        refreshTokenCookieService.write(response, refreshTokenService.issue(auth.user().id()));
 
         if (request.getSession(false) != null) {
             request.getSession(false).invalidate();
         }
 
-        URI location = UriComponentsBuilder.fromUriString(oauthProperties.getSuccessRedirect())
-                .queryParam("token", auth.accessToken())
-                .queryParam("userId", user.id().toString())
-                .queryParam("email", user.email())
-                .queryParam("firstName", user.firstName())
-                .queryParam("lastName", user.lastName())
-                .queryParam("authProvider", user.authProvider().name())
-                .queryParam("phoneVerified", user.phoneVerified())
-                .build()
-                .encode(StandardCharsets.UTF_8)
-                .toUri();
+        URI location = URI.create(oauthProperties.getSuccessRedirect());
         response.sendRedirect(location.toString());
     }
 }
