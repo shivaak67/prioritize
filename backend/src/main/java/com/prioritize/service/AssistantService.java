@@ -66,7 +66,17 @@ public class AssistantService {
             in dueDate; the server resolves it in the user's timezone. Do not calculate the date yourself.
             For tool calls: use dueDate as YYYY-MM-DD, 'today', 'tomorrow', or a weekday name;
             use dueTime as HH:MM or h:mm AM/PM,
-            and calendar startAt/endAt as ISO-8601 datetimes in the user's local timezone.
+            and calendar startDate/startTime/endDate/endTime as separate LOCAL dates and times.
+            For calendar dates, preserve today, tomorrow, and weekday words (including 'next Monday');
+            the server resolves them. A bare weekday means the next occurrence including today.
+            For '2:45-3:15 PM', both times are PM. Never calculate UTC offsets or convert event times to UTC.
+            Omit timeZone unless the user explicitly specifies a different timezone; use its IANA name.
+            Omit endDate for same-day creation. Include it for overnight events.
+            On updates, omit unchanged fields; moving startDate also moves the end date by the same number of days.
+            If a tool reports an offset mismatch, retry with the original local dates/times.
+            If a time occurs twice or does not exist due to daylight saving, ask the user to clarify;
+            never guess an offset. Only set startOffset/endOffset after the user chooses an occurrence.
+            Confirm calendar changes using the saved tool result in the user's timezone, including date, AM/PM and timezone.
             When mentioning times to the user, always use 12-hour clock with AM/PM (for example, 3:30 PM).
             Never use 24-hour or military time in replies.
             """;

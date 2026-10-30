@@ -24,6 +24,22 @@ describe('Interactive calendar', () => {
     component = TestBed.runInInjectionContext(() => new CalendarComponent());
   });
   afterEach(() => component.ngOnDestroy());
+  it('displays the assistant phone screen at 2:45–3:15 PM after the fall clock change', () => {
+    const format = Date.prototype.toLocaleTimeString;
+    spyOn(Date.prototype, 'toLocaleTimeString').and.callFake(function (
+      this: Date,
+      _locales?: Intl.LocalesArgument,
+      options?: Intl.DateTimeFormatOptions,
+    ) {
+      return format.call(this, 'en-US', { ...options, timeZone: 'America/Chicago' });
+    });
+    component.events.set([{
+      id: 'phone-screen', title: 'Fedex Phone screen', allDay: false,
+      startAt: '2026-11-02T20:45:00Z', endAt: '2026-11-02T21:15:00Z',
+    } as CalendarEventDto]);
+    expect(component.chipTime({ id: 'chip', entityId: 'phone-screen', kind: 'event', label: 'Fedex Phone screen' }))
+      .toBe('2:45 PM – 3:15 PM');
+  });
   it('loads the adjacent month when day navigation crosses a month boundary', () => {
     component.loading.set(false);
     component.viewMonth.set(new Date(2026, 9, 1));

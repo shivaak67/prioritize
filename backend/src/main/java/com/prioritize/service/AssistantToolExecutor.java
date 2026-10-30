@@ -102,20 +102,30 @@ public class AssistantToolExecutor {
                 "Create a calendar event with a start and end time.",
                 Map.of(
                         "title", stringProp("Event title"),
-                        "startAt", stringProp("Start time as ISO-8601 datetime"),
-                        "endAt", stringProp("End time as ISO-8601 datetime"),
+                        "startDate", stringProp("Local date: YYYY-MM-DD, today, tomorrow, or weekday name. Preserve relative date words."),
+                        "startTime", stringProp("Local start time as HH:mm or h:mm AM/PM. Never convert to UTC."),
+                        "endDate", stringProp("Local end date; omit for the same date as startDate"),
+                        "endTime", stringProp("Local end time as HH:mm or h:mm AM/PM. Never convert to UTC."),
+                        "timeZone", stringProp("IANA timezone ONLY if explicitly requested by the user; otherwise omit"),
+                        "startOffset", stringProp("Only to disambiguate a repeated local time after asking the user: e.g. -05:00"),
+                        "endOffset", stringProp("Only to disambiguate a repeated local time after asking the user: e.g. -06:00"),
                         "description", stringProp("Optional description")),
-                List.of("title", "startAt", "endAt")));
+                List.of("title", "startDate", "startTime", "endTime")));
         tools.add(functionTool(
                 "update_calendar_event",
                 "Update a calendar event. Provide eventId or eventTitle to identify the event.",
-                Map.of(
-                        "eventId", stringProp("Event UUID"),
-                        "eventTitle", stringProp("Exact or partial event title if eventId is unknown"),
-                        "title", stringProp("New title"),
-                        "startAt", stringProp("Start time as ISO-8601 datetime"),
-                        "endAt", stringProp("End time as ISO-8601 datetime"),
-                        "description", stringProp("Optional description")),
+                Map.ofEntries(
+                        Map.entry("eventId", stringProp("Event UUID")),
+                        Map.entry("eventTitle", stringProp("Exact or partial event title if eventId is unknown")),
+                        Map.entry("title", stringProp("New title")),
+                        Map.entry("startDate", stringProp("New local start date: YYYY-MM-DD, today, tomorrow, or weekday name")),
+                        Map.entry("startTime", stringProp("New local start time as HH:mm or h:mm AM/PM; never convert to UTC")),
+                        Map.entry("endDate", stringProp("New local end date; when moving startDate, omit to preserve the end's day offset")),
+                        Map.entry("endTime", stringProp("New local end time as HH:mm or h:mm AM/PM; never convert to UTC")),
+                        Map.entry("timeZone", stringProp("IANA timezone ONLY if explicitly requested by the user; otherwise omit")),
+                        Map.entry("startOffset", stringProp("Offset chosen by the user to disambiguate a repeated local start time")),
+                        Map.entry("endOffset", stringProp("Offset chosen by the user to disambiguate a repeated local end time")),
+                        Map.entry("description", stringProp("Optional description"))),
                 List.of()));
         tools.add(functionTool(
                 "delete_calendar_event",
@@ -229,8 +239,19 @@ public class AssistantToolExecutor {
 
     private String createEvent(UUID userId, JsonNode args, ZoneId zone) {
         String title = requiredText(args, "title");
-        Instant startAt = parseInstant(requiredText(args, "startAt"), zone);
-        Instant endAt = parseInstant(requiredText(args, "endAt"), zone);
+        ZoneId eventZone = eventZone(args, zone);
+        Instant startAt;
+        Instant endAt;
+        if (args.has("startAt") || args.has("endAt")) {
+            requireNoMixedEventFields(args);
+            startAt = parseInstant(requiredText(args, "startAt"), eventZone);
+            endAt = parseInstant(requiredText(args, "endAt"), eventZone);
+        } else {
+            LocalDate startDate = eventDate(requiredText(args, "startDate"), eventZone);
+            LocalDate endDate = args.has("endDate") ? eventDate(requiredText(args, "endDate"), eventZone) : startDate;
+            startAt = resolveEventTime(startDate.atTime(eventTime(args, "startTime")), eventZone, optionalText(args, "startOffset"));
+            endAt = resolveEventTime(endDate.atTime(eventTime(args, "endTime")), eventZone, optionalText(args, "endOffset"));
+        }
         CalendarEventRequest request = new CalendarEventRequest(
                 title,
                 optionalText(args, "description"),
@@ -244,12 +265,32 @@ public class AssistantToolExecutor {
 
     private String updateEvent(UUID userId, JsonNode args, ZoneId zone) {
         CalendarEventResponse existing = findEvent(userId, args);
+        ZoneId eventZone = eventZone(args, zone);
+        Instant startAt = existing.startAt();
+        Instant endAt = existing.endAt();
+        if (args.has("startAt") || args.has("endAt")) {
+            requireNoMixedEventFields(args);
+            if (args.has("startAt")) startAt = parseInstant(requiredText(args, "startAt"), eventZone);
+            if (args.has("endAt")) endAt = parseInstant(requiredText(args, "endAt"), eventZone);
+        } else {
+            LocalDateTime oldStart = startAt.atZone(eventZone).toLocalDateTime();
+            LocalDateTime oldEnd = endAt.atZone(eventZone).toLocalDateTime();
+            LocalDate startDate = args.has("startDate") ? eventDate(requiredText(args, "startDate"), eventZone) : oldStart.toLocalDate();
+            LocalDate endDate = args.has("endDate") ? eventDate(requiredText(args, "endDate"), eventZone)
+                    : oldEnd.toLocalDate().plusDays(java.time.temporal.ChronoUnit.DAYS.between(oldStart.toLocalDate(), startDate));
+            if (args.has("startDate") || args.has("startTime") || args.has("startOffset")) {
+                startAt = resolveEventTime(startDate.atTime(args.has("startTime") ? eventTime(args, "startTime") : oldStart.toLocalTime()), eventZone, optionalText(args, "startOffset"));
+            }
+            if (args.has("startDate") || args.has("endDate") || args.has("endTime") || args.has("endOffset")) {
+                endAt = resolveEventTime(endDate.atTime(args.has("endTime") ? eventTime(args, "endTime") : oldEnd.toLocalTime()), eventZone, optionalText(args, "endOffset"));
+            }
+        }
         CalendarEventRequest request = new CalendarEventRequest(
                 optionalText(args, "title") != null ? optionalText(args, "title") : existing.title(),
                 args.has("description") ? optionalText(args, "description") : existing.description(),
                 existing.categoryId(),
-                args.has("startAt") ? parseInstant(requiredText(args, "startAt"), zone) : existing.startAt(),
-                args.has("endAt") ? parseInstant(requiredText(args, "endAt"), zone) : existing.endAt(),
+                startAt,
+                endAt,
                 existing.allDay());
         CalendarEventResponse updated = calendarEventService.update(userId, existing.id(), request);
         return success("Calendar event updated", eventSummary(updated, zone));
@@ -395,11 +436,55 @@ public class AssistantToolExecutor {
     }
 
     private Instant parseInstant(String value, ZoneId zone) {
+        // Old tool payloads remain supported, but an AI-generated offset must never
+        // silently override the named timezone's rules for the event date.
         try {
-            return Instant.parse(value);
+            var offsetTime = java.time.OffsetDateTime.parse(value);
+            return resolveEventTime(offsetTime.toLocalDateTime(), zone, offsetTime.getOffset().getId());
         } catch (DateTimeParseException ignored) {
-            return LocalDateTime.parse(value).atZone(zone).toInstant();
+            return resolveEventTime(LocalDateTime.parse(value), zone, null);
         }
+    }
+
+    private ZoneId eventZone(JsonNode args, ZoneId fallback) {
+        String requested = optionalText(args, "timeZone");
+        return requested == null ? fallback : ZoneId.of(requested);
+    }
+
+    private LocalDate eventDate(String value, ZoneId zone) {
+        if (value.toLowerCase(Locale.US).startsWith("next ")) {
+            DayOfWeek day = DayOfWeek.valueOf(value.substring(5).trim().toUpperCase(Locale.US));
+            return LocalDate.now(clock.withZone(zone)).with(TemporalAdjusters.next(day));
+        }
+        return parseDueDate(objectMapper.getNodeFactory().textNode(value), zone);
+    }
+
+    private LocalTime eventTime(JsonNode args, String field) {
+        return parseDueTime(objectMapper.getNodeFactory().textNode(requiredText(args, field)));
+    }
+
+    private void requireNoMixedEventFields(JsonNode args) {
+        for (String field : List.of("startDate", "startTime", "endDate", "endTime", "startOffset", "endOffset")) {
+            if (args.has(field)) throw new IllegalArgumentException("Use local date/time fields only; do not mix them with startAt/endAt.");
+        }
+    }
+
+    private Instant resolveEventTime(LocalDateTime local, ZoneId zone, String offsetText) {
+        var offsets = zone.getRules().getValidOffsets(local);
+        if (offsets.isEmpty()) {
+            throw new IllegalArgumentException("That local time does not exist because of daylight saving time in " + zone + ". Ask the user for another time; nothing was saved.");
+        }
+        if (offsetText != null) {
+            var offset = java.time.ZoneOffset.of(offsetText);
+            if (!offsets.contains(offset)) {
+                throw new IllegalArgumentException("Offset does not match " + zone + " on " + local.toLocalDate() + ". Retry using the user's original local date/time fields without converting to UTC.");
+            }
+            return local.toInstant(offset);
+        }
+        if (offsets.size() > 1) {
+            throw new IllegalArgumentException("That local time occurs twice because of daylight saving time in " + zone + ". Ask the user which occurrence they mean (" + offsets + ") before saving.");
+        }
+        return local.toInstant(offsets.getFirst());
     }
 
     private TaskPriority parsePriority(JsonNode node) {
