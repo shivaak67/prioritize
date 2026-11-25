@@ -44,7 +44,7 @@ class AssistantReliabilityIntegrationTest {
                     "{\"taskId\":\""+UUID.randomUUID()+"\"}"))))
                 .thenReturn(new LlmCompletion("That task could not be found; nothing was changed.",List.of()));
             assertThat(assistant.chat(owner,new AssistantChatRequest("Complete that task",null,"America/Chicago")).reply())
-                .contains("could not be found");
+                .contains("couldn't save", "Task not found");
             verify(llm,times(2)).complete(any(),any());
         } finally { properties.setEnabled(enabled); properties.setApiKey(key); users.deleteById(owner); }
     }
@@ -80,7 +80,7 @@ class AssistantReliabilityIntegrationTest {
                     "{\"eventId\":\""+id+"\"}"))))
                 .thenReturn(new LlmCompletion("Canvas assignments are read-only; nothing was deleted.",List.of()));
             assertThat(assistant.chat(owner,new AssistantChatRequest("Delete that event",null,"America/Chicago")).reply())
-                .contains("nothing was deleted");
+                .contains("couldn't save", "read-only");
             assertThat(events.existsById(id)).isTrue();
         } finally {
             properties.setEnabled(enabled); properties.setApiKey(key); events.deleteById(id); users.deleteById(owner);

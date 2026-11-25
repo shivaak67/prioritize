@@ -101,6 +101,35 @@ class AssistantDateTest {
         assertThat(request.getValue().dueDate()).isEqualTo(LocalDate.of(2026, 9, 10));
     }
 
+    @Test void explicitMonthDayWinsOverWeekdayAndIncorrectModelDate() {
+        var executor = new AssistantToolExecutor(new ObjectMapper(), tasks, events, clock);
+        executor.execute(userId, "create_task",
+                "{\"title\":\"Essay\",\"dueDate\":\"2026-09-09\"}", ZoneId.of("America/Chicago"),
+                "Create Essay due Wednesday, December 9, 2026");
+        var request = ArgumentCaptor.forClass(TaskRequest.class);
+        verify(tasks).create(eq(userId), request.capture());
+        assertThat(request.getValue().dueDate()).isEqualTo(LocalDate.of(2026, 12, 9));
+    }
+
+    @Test void repeatedSuccessClaimsWithoutToolsCannotClaimAnItemWasSaved() {
+        properties.setEnabled(true); properties.setApiKey("test");
+        when(dashboard.summary(eq(userId), any())).thenReturn(mock(DashboardSummaryResponse.class));
+        when(llm.complete(any(), any())).thenReturn(new LlmCompletion("Successfully created it!", List.of()));
+        assertThat(service.chat(userId, new AssistantChatRequest(
+                "\"Linear Algebra Final\" due Thu, Dec. 10 10:30 a.m.–12:30 p.m.", null, "America/Chicago")).reply())
+                .contains("couldn't save").doesNotContain("Successfully created");
+        verify(llm, times(2)).complete(any(), any());
+    }
+
+    @Test void anActionRequestCanAskForMissingDetailsWithoutInventingConflicts() {
+        properties.setEnabled(true); properties.setApiKey("test");
+        when(dashboard.summary(eq(userId), any())).thenReturn(mock(DashboardSummaryResponse.class));
+        when(llm.complete(any(), any())).thenReturn(new LlmCompletion("What date and time should I use?", List.of()));
+        assertThat(service.chat(userId, new AssistantChatRequest("Add a meeting", null, "America/Chicago")).reply())
+                .isEqualTo("What date and time should I use?");
+        verify(llm).complete(any(), any());
+    }
+
     @Test
     @SuppressWarnings("unchecked")
     void calendarContextKeepsLocalDatesAcrossMidnightAndChecksAllLists() {

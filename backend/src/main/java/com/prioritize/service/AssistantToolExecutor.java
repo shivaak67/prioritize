@@ -40,6 +40,13 @@ public class AssistantToolExecutor {
     private static final Pattern WEEKDAY_PATTERN = Pattern.compile(
             "\\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\\b",
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern EXPLICIT_DATE = Pattern.compile(
+            "\\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(20\\d{2}))?\\b",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern TIME_RANGE = Pattern.compile(
+            "\\b\\d{1,2}(?::\\d{2})?\\s*(?:[ap]\\.?m\\.?)?\\s*[-–—]\\s*\\d{1,2}(?::\\d{2})?\\s*[ap]\\.?m\\.?",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern ISO_DATE = Pattern.compile("\\b20\\d{2}-\\d{2}-\\d{2}\\b");
 
     private final ObjectMapper objectMapper;
     private final TaskService taskService;
@@ -144,7 +151,10 @@ public class AssistantToolExecutor {
     public String execute(UUID userId, String toolName, String argumentsJson, ZoneId zone, String userMessage) {
         try {
             JsonNode args = objectMapper.readTree(argumentsJson == null ? "{}" : argumentsJson);
-            applyRequestedWeekday(args, toolName, userMessage, zone);
+            if ("create_task".equals(toolName) && userMessage != null && TIME_RANGE.matcher(userMessage).find()) {
+                return error("A task only stores one deadline time. Use create_calendar_event with the user's start and end times to preserve the full time range.");
+            }
+            applyRequestedDate(args, toolName, userMessage, zone);
             return switch (toolName) {
                 case "create_task" -> createTask(userId, args, zone);
                 case "update_task" -> updateTask(userId, args, zone);
@@ -160,12 +170,36 @@ public class AssistantToolExecutor {
         }
     }
 
-    private void applyRequestedWeekday(JsonNode args, String toolName, String userMessage, ZoneId zone) {
+    private void applyRequestedDate(JsonNode args, String toolName, String userMessage, ZoneId zone) {
         if (!(args instanceof ObjectNode objectArgs)
-                || !("create_task".equals(toolName) || "update_task".equals(toolName))
                 || userMessage == null) {
             return;
         }
+
+        boolean task = "create_task".equals(toolName) || "update_task".equals(toolName);
+        boolean event = "create_calendar_event".equals(toolName) || "update_calendar_event".equals(toolName);
+        if (!task && !event) return;
+        if (toolName.startsWith("update_") && !args.has(task ? "dueDate" : "startDate")) return;
+        Matcher isoDate = ISO_DATE.matcher(userMessage);
+        if (isoDate.find()) {
+            LocalDate date = LocalDate.parse(isoDate.group());
+            if (!isoDate.find()) applyExplicitDate(objectArgs, task, date);
+            return;
+        }
+        Matcher explicitDate = EXPLICIT_DATE.matcher(userMessage);
+        if (explicitDate.find()) {
+            String month = explicitDate.group(1).substring(0, 3).toLowerCase(Locale.US);
+            int monthNumber = List.of("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec").indexOf(month) + 1;
+            LocalDate today = LocalDate.now(clock.withZone(zone));
+            int year = explicitDate.group(3) == null ? today.getYear() : Integer.parseInt(explicitDate.group(3));
+            LocalDate date = LocalDate.of(year, monthNumber, Integer.parseInt(explicitDate.group(2)));
+            if (explicitDate.group(3) == null && date.isBefore(today)) date = date.plusYears(1);
+            // Multiple dates can describe multiple items or an overnight range. Let their individual fields resolve them.
+            if (explicitDate.find()) return;
+            applyExplicitDate(objectArgs, task, date);
+            return;
+        }
+        if (!task) return;
 
         Matcher matcher = WEEKDAY_PATTERN.matcher(userMessage);
         DayOfWeek requestedDay = null;
@@ -178,6 +212,16 @@ public class AssistantToolExecutor {
 
         LocalDate today = LocalDate.now(clock.withZone(zone));
         objectArgs.put("dueDate", today.with(TemporalAdjusters.nextOrSame(requestedDay)).toString());
+    }
+
+    private void applyExplicitDate(ObjectNode args, boolean task, LocalDate date) {
+        if (!task && args.has("startAt")) return;
+        String field = task ? "dueDate" : "startDate";
+        String previousStart = optionalText(args, field);
+        args.put(field, date.toString());
+        if (!task && previousStart != null && previousStart.equals(optionalText(args, "endDate"))) {
+            args.put("endDate", date.toString());
+        }
     }
 
     private String createTask(UUID userId, JsonNode args, ZoneId zone) {
@@ -326,9 +370,7 @@ public class AssistantToolExecutor {
         if (eventTitle == null) {
             throw new IllegalArgumentException("Provide eventId or eventTitle");
         }
-        Instant now = clock.instant();
-        Instant weekAhead = now.plusSeconds(7L * 24 * 60 * 60);
-        List<CalendarEventResponse> events = calendarEventService.list(userId, now.minusSeconds(30L * 24 * 60 * 60), weekAhead);
+        List<CalendarEventResponse> events = calendarEventService.list(userId, null, null);
         return findByTitle(events, eventTitle, "calendar event");
     }
 
@@ -531,6 +573,39 @@ public class AssistantToolExecutor {
         root.put("success", false);
         root.put("error", message);
         return root.toString();
+    }
+
+    boolean succeeded(String result) {
+        try {
+            return objectMapper.readTree(result).path("success").asBoolean(false);
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    String describeResult(String result, ZoneId zone) {
+        try {
+            JsonNode root = objectMapper.readTree(result);
+            if (!root.path("success").asBoolean(false)) {
+                return "I couldn't save that change. " + root.path("error").asText("The operation failed.");
+            }
+            JsonNode data = root.path("data");
+            String description = root.path("message").asText("Change saved") + ": \"" + data.path("title").asText() + "\"";
+            var dateFormat = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US);
+            if (data.hasNonNull("startAt")) {
+                var start = java.time.OffsetDateTime.parse(data.get("startAt").asText()).atZoneSameInstant(zone);
+                var end = java.time.OffsetDateTime.parse(data.get("endAt").asText()).atZoneSameInstant(zone);
+                description += " on " + dateFormat.format(start) + " from " + TIME_12H.format(start)
+                        + "–" + (start.toLocalDate().equals(end.toLocalDate()) ? "" : dateFormat.format(end) + " ")
+                        + TIME_12H.format(end) + " (" + zone.getId() + ")";
+            } else if (data.hasNonNull("dueDate")) {
+                description += ", due " + dateFormat.format(LocalDate.parse(data.get("dueDate").asText()));
+                if (data.hasNonNull("dueTime")) description += " at " + data.get("dueTime").asText();
+            }
+            return description + ".";
+        } catch (Exception ex) {
+            return "The operation returned an unreadable result. Check your tasks or calendar before retrying.";
+        }
     }
 
     private static Map<String, Object> functionTool(

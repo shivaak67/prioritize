@@ -44,6 +44,17 @@ public class AssistantService {
             When the user asks you to create, update, complete, or delete something, use the appropriate tool.
             Do not tell the user to do it manually if you can do it with a tool.
             After using tools, confirm what you did in plain language.
+            A quoted title followed by a due date/time is a request to create that item.
+            A final, exam, meeting or appointment with a start AND end time belongs in a calendar event,
+            even if the user says 'due'. A task dueTime is a single deadline and cannot store a time range.
+            Tasks and calendar events may share dates and times. The application allows overlaps.
+            Never refuse creation because of a supposed conflict, duplicate, or another task on that date.
+            Only report a conflict if an actual tool returns that error. A deadline is not a busy interval.
+            When asked about overlapping events, compare full local dates AND both endpoints:
+            startA < endB AND startB < endA. Adjacent intervals do not overlap.
+            If an end time is unknown, say the duration is unknown instead of inventing an overlap.
+            Explicit month/day dates take precedence over relative weekday calculations.
+            Use the current year for upcoming month/day dates, never a year from old chat history.
             Use only the user data provided below. If something is not in the data, say you do not have that information.
             Canvas assignment deadlines (including quizzes) are work to complete, just like personal tasks.
             For daily focus or planning questions, always check unfinished Canvas assignments due today
@@ -136,10 +147,29 @@ public class AssistantService {
 
     private String runWithTools(UUID userId, List<Map<String, Object>> messages,
             List<Map<String, Object>> tools, ZoneId zone, String userMessage) {
+        List<String> savedResults = new ArrayList<>();
+        String lastFailure = null;
+        boolean requestedAction = userMessage.matches("(?is)\\s*(?:please\\s+|can you\\s+|could you\\s+)?(?:create|add|schedule|update|change|move|delete|remove|complete)\\b.*")
+                || userMessage.matches("(?is).*?[\"“][^\"”]+[\"”]\\s+due\\b.*");
+        boolean retriedMissingAction = false;
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
             LlmCompletion completion = llmClient.complete(messages, tools);
 
             if (!completion.hasToolCalls()) {
+                if (!savedResults.isEmpty()) return String.join("\n", savedResults) + (lastFailure == null ? "" : "\n" + lastFailure);
+                if (lastFailure != null) return lastFailure;
+                if (requestedAction) {
+                    if (retriedMissingAction) return "I couldn't save that change. Please retry with the title, date, and time.";
+                    messages.add(Map.of("role", "system", "content",
+                            "The user requested a change, but no tool has run. Use the appropriate tool now, or ask a specific question if required details are missing. Never invent conflicts or claim a change was saved."));
+                    // A real clarification may be needed. Require a retry only for a refusal or success claim.
+                    if (completion.content() != null && completion.content().contains("?")
+                            && !completion.content().toLowerCase(Locale.US).matches("(?s).*(conflict|created|saved|scheduled|successfully).*") ) {
+                        return completion.content();
+                    }
+                    retriedMissingAction = true;
+                    continue;
+                }
                 return completion.content() == null ? "" : completion.content();
             }
 
@@ -147,6 +177,11 @@ public class AssistantService {
 
             for (LlmToolCall call : completion.toolCalls()) {
                 String result = toolExecutor.execute(userId, call.name(), call.arguments(), zone, userMessage);
+                String confirmation = toolExecutor.describeResult(result, zone);
+                if (toolExecutor.succeeded(result)) {
+                    savedResults.add(confirmation);
+                    lastFailure = null;
+                } else lastFailure = confirmation;
                 messages.add(Map.of(
                         "role", "tool",
                         "tool_call_id", call.id(),
@@ -154,8 +189,8 @@ public class AssistantService {
             }
         }
 
-        LlmCompletion finalCompletion = llmClient.complete(messages, null);
-        return finalCompletion.content() == null ? "Done." : finalCompletion.content();
+        if (!savedResults.isEmpty()) return String.join("\n", savedResults) + (lastFailure == null ? "" : "\n" + lastFailure);
+        return lastFailure != null ? lastFailure : "I couldn't save that change. Please try again.";
     }
 
     private Map<String, Object> buildAssistantToolMessage(LlmCompletion completion) {
@@ -181,7 +216,6 @@ public class AssistantService {
 
     private String buildContext(UUID userId, ZoneId zone) {
         Instant now = clock.instant();
-        Instant weekAhead = now.plusSeconds(7L * 24 * 60 * 60);
 
         List<TaskResponse> tasks = taskService.list(userId, null, null, null);
         DashboardSummaryResponse summary = dashboardService.summary(userId, zone);
@@ -259,9 +293,8 @@ public class AssistantService {
         }
         sb.append('\n');
         events = events.stream().filter(e -> !"DEADLINE".equals(e.canvasKind())
-                && e.endAt().isAfter(now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant())
-                && e.startAt().isBefore(weekAhead)).toList();
-        sb.append("Calendar events (today and next 7 days):\n");
+                && e.endAt().isAfter(now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant())).toList();
+        sb.append("Calendar events (today and upcoming):\n");
         if (events.isEmpty()) {
             sb.append("- (none)\n");
         } else {
