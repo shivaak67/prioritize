@@ -232,6 +232,12 @@ Feed URLs are encrypted with AES-GCM and never returned by the API. By default t
 
 This is the live topology verified on September 9, 2026. EBS persistence is separate from backups; the single host remains a shared failure point. See `docker-compose.prod.yml` and `infra/` for deployment configuration.
 
+## AI diagnostic logs
+
+Assistant requests have a shared request ID across the submitted message/history, full model input and response, tool calls, server-resolved arguments, results, retries, errors, and final reply. The records include the account ID, timezone, model and elapsed times. Transport authorization headers and configured API keys are excluded. Message content and planning context are included.
+
+Logs are JSON lines in `backend/logs/ai-audit.jsonl` locally. Production mounts `/opt/prioritize-data/ai-logs` at `/app/logs`, preserving records across container deployments. Files rotate at 10 MB; archives expire after 14 days or when their combined size exceeds 100 MB. Access production logs through the existing AWS Systems Manager connection. Set `AI_AUDIT_LOG_LEVEL=OFF` and recreate the backend to disable recording.
+
 ## Analytics (Power BI)
 
 Power BI connects to PostgreSQL for completion rates, workload trends, and estimated vs actual time. Angular remains the interactive app UI.

@@ -155,6 +155,8 @@ public class AssistantToolExecutor {
                 return error("A task only stores one deadline time. Use create_calendar_event with the user's start and end times to preserve the full time range.");
             }
             applyRequestedDate(args, toolName, userMessage, zone);
+            AssistantAuditLog.write("tool_resolved_arguments", Map.of("tool", toolName, "arguments", args,
+                    "timeZone", zone.getId()));
             return switch (toolName) {
                 case "create_task" -> createTask(userId, args, zone);
                 case "update_task" -> updateTask(userId, args, zone);

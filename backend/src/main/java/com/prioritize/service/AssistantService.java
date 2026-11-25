@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.slf4j.MDC;
 
 import com.prioritize.config.AiProperties;
 import com.prioritize.dto.AssistantChatRequest;
@@ -118,6 +119,27 @@ public class AssistantService {
     }
 
     public AssistantChatResponse chat(UUID userId, AssistantChatRequest request) {
+        Map<String, String> previousContext = MDC.getCopyOfContextMap();
+        long started = System.nanoTime();
+        MDC.put(AssistantAuditLog.REQUEST_ID, UUID.randomUUID().toString());
+        MDC.put(AssistantAuditLog.USER_ID, userId.toString());
+        try {
+            AssistantAuditLog.write("chat_request", request);
+            AssistantChatResponse response = handleChat(userId, request);
+            AssistantAuditLog.write("chat_response", Map.of("response", response,
+                    "durationMs", (System.nanoTime() - started) / 1_000_000));
+            return response;
+        } catch (RuntimeException ex) {
+            AssistantAuditLog.write("chat_error", Map.of("errorType", ex.getClass().getName(),
+                    "durationMs", (System.nanoTime() - started) / 1_000_000));
+            throw ex;
+        } finally {
+            if (previousContext == null) MDC.clear();
+            else MDC.setContextMap(previousContext);
+        }
+    }
+
+    private AssistantChatResponse handleChat(UUID userId, AssistantChatRequest request) {
         ZoneId zone = resolveZone(request.timeZone());
         if (isDateQuestion(request.message())) {
             return new AssistantChatResponse("Today's date is "
@@ -153,6 +175,7 @@ public class AssistantService {
                 || userMessage.matches("(?is).*?[\"“][^\"”]+[\"”]\\s+due\\b.*");
         boolean retriedMissingAction = false;
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            AssistantAuditLog.write("model_round", Map.of("round", round + 1));
             LlmCompletion completion = llmClient.complete(messages, tools);
 
             if (!completion.hasToolCalls()) {
@@ -168,6 +191,7 @@ public class AssistantService {
                         return completion.content();
                     }
                     retriedMissingAction = true;
+                    AssistantAuditLog.write("action_retry", Map.of("reason", "No tool call for requested action"));
                     continue;
                 }
                 return completion.content() == null ? "" : completion.content();
@@ -176,7 +200,9 @@ public class AssistantService {
             messages.add(buildAssistantToolMessage(completion));
 
             for (LlmToolCall call : completion.toolCalls()) {
+                AssistantAuditLog.write("tool_call", call);
                 String result = toolExecutor.execute(userId, call.name(), call.arguments(), zone, userMessage);
+                AssistantAuditLog.write("tool_result", Map.of("toolCallId", call.id(), "tool", call.name(), "result", result));
                 String confirmation = toolExecutor.describeResult(result, zone);
                 if (toolExecutor.succeeded(result)) {
                     savedResults.add(confirmation);
@@ -189,6 +215,7 @@ public class AssistantService {
             }
         }
 
+        AssistantAuditLog.write("tool_round_limit", Map.of("limit", MAX_TOOL_ROUNDS));
         if (!savedResults.isEmpty()) return String.join("\n", savedResults) + (lastFailure == null ? "" : "\n" + lastFailure);
         return lastFailure != null ? lastFailure : "I couldn't save that change. Please try again.";
     }

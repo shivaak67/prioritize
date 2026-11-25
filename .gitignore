@@ -26,6 +26,7 @@ Desktop.ini
 backend/target/
 backend/.mvn/wrapper/maven-wrapper.jar
 backend/*.log
+backend/logs/
 *.class
 *.jar
 *.war

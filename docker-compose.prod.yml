@@ -23,6 +23,8 @@ services:
     build: ./backend
     container_name: prioritize-backend
     restart: unless-stopped
+    volumes:
+      - /opt/prioritize-data/ai-logs:/app/logs
     depends_on:
       db:
         condition: service_healthy
@@ -47,6 +49,7 @@ services:
       AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
       AI_WARMUP_ENABLED: ${AI_WARMUP_ENABLED:-false}
       AI_KEEP_ALIVE: ${AI_KEEP_ALIVE:-30m}
+      AI_AUDIT_LOG_LEVEL: ${AI_AUDIT_LOG_LEVEL:-INFO}
       NOTIFICATIONS_EMAIL_ENABLED: ${NOTIFICATIONS_EMAIL_ENABLED:-false}
       NOTIFICATIONS_SMS_ENABLED: ${NOTIFICATIONS_SMS_ENABLED:-false}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}

@@ -19,7 +19,8 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 RUN addgroup -S spring && adduser -S spring -G spring \
-    && apk add --no-cache curl
+    && apk add --no-cache curl \
+    && mkdir -p /app/logs && chown spring:spring /app/logs && chmod 700 /app/logs
 
 USER spring:spring
 

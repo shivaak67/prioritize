@@ -65,7 +65,19 @@ public class LlmClient {
             body.put("tool_choice", "auto");
         }
         applyKeepAlive(body);
-        return parseCompletion(sendChatRequest(body));
+        AssistantAuditLog.write("model_request", body);
+        long started = System.nanoTime();
+        try {
+            String response = sendChatRequest(body);
+            AssistantAuditLog.write("model_response", Map.of("body", response,
+                    "durationMs", (System.nanoTime() - started) / 1_000_000));
+            return parseCompletion(response);
+        } catch (RuntimeException ex) {
+            AssistantAuditLog.write("model_error", Map.of("errorType", ex.getClass().getName(),
+                    "message", ex instanceof ApiException ? ex.getMessage() : "AI request failed",
+                    "durationMs", (System.nanoTime() - started) / 1_000_000));
+            throw ex;
+        }
     }
 
     private void applyKeepAlive(Map<String, Object> body) {
